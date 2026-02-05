@@ -395,130 +395,859 @@
 
 <script>
 (() => {
-  // ... 네 원본 스크립트 전체 그대로 (CFG, State, DOM, Utils, svgShape, blockRuleText, makeStimulus, isiFor, newTrial, stopAllTimers, totalPlannedSec, startGlobalTimer, resetAll, startSequence, showInstruction, startBlock, blockDurSec, scheduleNextStimulus, presentStimulus, finishBlock, pressedFlash, handleTap, finalizeOmissionIfNeeded, computeOmissionThreshold, summarizeBlock, invalidState, summarizeBinsForBlock, blockOffsetSec, summarizeGlobalBins, renderResults, drawLineChart, attachCrosshair, trialsToCSV, downloadText 등)
-
   // =========================================================
-  // S3 업로드 추가 (Vercel presigned URL 방식)
+  // Config & State & Utils & Shapes & Block Rules & Flow (네 원본 그대로)
   // =========================================================
-  const API_ENDPOINT = '/api/get-presigned-url';
-
-  async function uploadToS3() {
-    if (State.trials.length === 0) {
-      alert("데이터가 없습니다.");
-      return;
+  const CFG = {
+    stimOnMs: 180,
+    dur: { b0: 60, b1: 120, b2: 120, b3: 180, b4: 60 },
+    instructionSec: 10,
+    isiFixedMin: 1000,
+    isiFixedMax: 1600,
+    isiB2: {
+      pre: [1000, 1600],
+      mid: [700, 1100],
+      post: [1000, 1600],
+    },
+    baselineMinN: 30,
+    omissionAddMs: 250,
+    omissionCapMs: 1200,
+    omissionFallbackMs: 1100,
+    anticipatoryMs: 150,
+    binSec: 15,
+    invalid: {
+      minTargets: 12,
+      hitRateBelow: 0.20,
+      commissionRateAbove: 0.60,
     }
+  };
 
-    const payload = {
-      submittedAt: new Date().toISOString(),
-      omissionThresholdMs: State.omissionThresholdMs,
-      cfg: CFG,
-      trials: State.trials
+  const State = {
+    phase: "idle",
+    block: null,
+    blockStartTs: 0,
+    blockTimerId: null,
+    stimTimeoutId: null,
+    nextStimTimeoutId: null,
+    lastPresentedTs: 0,
+    awaitingTrialId: null,
+    trialIndexInBlock: 0,
+    trials: [],
+    baselineRTs: [],
+    omissionThresholdMs: CFG.omissionFallbackMs,
+    hasAnyData: false,
+    testStartTs: 0,
+    testTotalPlannedSec: 0,
+    testTickerId: null,
+  };
+
+  const stimulusEl = document.getElementById("stimulus");
+  const tapBtn = document.getElementById("tapBtn");
+  const startBtn = document.getElementById("startBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const openResultsBtn = document.getElementById("openResultsBtn");
+  const hintEl = document.getElementById("hint");
+  const startRow = document.getElementById("startRow");
+  const overlay = document.getElementById("overlay");
+  const ovTitle = document.getElementById("ovTitle");
+  const ovBody = document.getElementById("ovBody");
+  const ovCountdown = document.getElementById("ovCountdown");
+  const ovSkip = document.getElementById("ovSkip");
+  const results = document.getElementById("results");
+  const closeResults = document.getElementById("closeResults");
+  const blockSummaries = document.getElementById("blockSummaries");
+  const blockBins = document.getElementById("blockBins");
+  const quadCharts = document.getElementById("quadCharts");
+  const thrPill = document.getElementById("thrPill");
+  const dlCsv = document.getElementById("dlCsv");
+  const dlJson = document.getElementById("dlJson");
+  const tooltip = document.getElementById("tooltip");
+  const timeRow = document.getElementById("timeRow");
+  const timeLeftEl = document.getElementById("timeLeft");
+
+  document.addEventListener("gesturestart", (e)=>e.preventDefault());
+  document.addEventListener("dblclick", (e)=>e.preventDefault());
+
+  const nowMs = () => performance.now();
+  const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+  const randi = (a,b)=>Math.floor(a + Math.random()*(b-a+1));
+  const mean = (arr)=> arr.reduce((s,x)=>s+x,0)/arr.length;
+  const std = (arr)=>{
+    if(arr.length<2) return null;
+    const m=mean(arr);
+    const v=arr.reduce((s,x)=>s+(x-m)*(x-m),0)/(arr.length-1);
+    return Math.sqrt(v);
+  };
+  const percentile = (xs, p)=>{
+    if(xs.length===0) return null;
+    const s = [...xs].sort((a,b)=>a-b);
+    if(s.length===1) return s[0];
+    const pp = clamp(p,0,1);
+    const idx = (s.length-1)*pp;
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    if(lo===hi) return s[lo];
+    const w = idx-lo;
+    return s[lo]*(1-w) + s[hi]*w;
+  };
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function fmtMMSS(sec){
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec/60);
+    const s = sec%60;
+    return `${pad2(m)}:${pad2(s)}`;
+  }
+
+  function syncStartRowVisibility(){
+    const show = (State.phase === "idle");
+    startRow.classList.toggle("hidden", !show);
+  }
+
+  function syncTimeRowVisibility(){
+    const show = (State.phase !== "idle");
+    timeRow.classList.toggle("hidden", !show);
+  }
+
+  function svgShape(kind, opts={}) {
+    const stroke = opts.stroke || "rgba(255,255,255,0.92)";
+    const strokeW = opts.strokeW || 10;
+    const fill = "none";
+    const size = 260;
+    const cx = size/2, cy = size/2;
+    const header = `<svg width="100%" height="100%" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
+    const footer = `</svg>`;
+    const circle = (r) =>
+      `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" />`;
+    const square = (side) => {
+      const x = cx - side/2;
+      const y = cy - side/2;
+      return `<rect x="${x}" y="${y}" width="${side}" height="${side}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" />`;
     };
+    const triangle = (radius) => {
+      const p1 = [cx, cy - radius];
+      const p2 = [cx - radius*0.866, cy + radius*0.5];
+      const p3 = [cx + radius*0.866, cy + radius*0.5];
+      return `<path d="M ${p1[0]} ${p1[1]} L ${p2[0]} ${p2[1]} L ${p3[0]} ${p3[1]} Z"
+        fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" stroke-linejoin="round" />`;
+    };
+    function drawBasic(k, scale=1.0){
+      if(k==="circle") return circle(80*scale);
+      if(k==="square") return square(160*scale);
+      if(k==="triangle") return triangle(100*scale);
+      return "";
+    }
+    if(kind==="circle") return header + drawBasic("circle",1.0) + footer;
+    if(kind==="square") return header + drawBasic("square",1.0) + footer;
+    if(kind==="triangle") return header + drawBasic("triangle",1.0) + footer;
+    if(kind==="compound") {
+      const outer = opts.outer;
+      const inner = opts.inner;
+      return header
+        + drawBasic(outer, 1.0)
+        + `<g opacity="0.95">` + drawBasic(inner, 0.55) + `</g>`
+        + footer;
+    }
+    return header + footer;
+  }
 
-    try {
-      // presigned URL 받기
-      const res = await fetch(API_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentType: 'application/json' })
-      });
+  function showStimulus(svg) {
+    stimulusEl.innerHTML = svg;
+    stimulusEl.classList.add("show");
+  }
 
-      if (!res.ok) {
-        throw new Error(`Presigned URL 요청 실패: ${res.status}`);
-      }
+  function hideStimulus() {
+    stimulusEl.classList.remove("show");
+    stimulusEl.innerHTML = "";
+  }
 
-      const { url } = await res.json();
-
-      // S3에 PUT
-      const uploadRes = await fetch(url, {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error(`S3 업로드 실패: ${uploadRes.status}`);
-      }
-
-      alert("결과가 S3에 저장되었습니다!");
-    } catch (err) {
-      console.error("업로드 오류:", err);
-      alert("전송 실패: " + err.message + "\n콘솔(F12) 확인해주세요.");
+  function blockRuleText(block) {
+    switch(block){
+      case 0:
+        return "블록0 (약 1분)\n세모(△) / 네모(□) 중\n네모(□)일 때만 TAP";
+      case 1:
+        return "블록1 (약 2분)\n동그라미(○) / 세모(△) 중\n세모(△)일 때만 TAP";
+      case 2:
+        return "블록2 (약 2분)\n동그라미(○) / 세모(△) / 네모(□) 중\n세모(△)일 때만 TAP\n(도형이 바뀌는 속도가 달라집니다)";
+      case 3:
+        return "블록3 (약 3분)\n자극 간 간격(ISI) 고정 범위\n복합도형 중\n'세모(△) 안에 동그라미(○)'일 때만 TAP";
+      case 4:
+        return "블록4 (쿨다운, 약 1분)\n동그라미(○) / 세모(△) / 네모(□)\n네모(□)일 때만 TAP";
+      default:
+        return "";
     }
   }
 
-  // =========================================================
-  // Results 화면에 "결과 전송" 버튼 추가
-  // =========================================================
-  function addS3UploadButton() {
-    const topbarButtons = document.querySelector('.topbar > div[style*="display:flex"]');
-    if (topbarButtons && !document.getElementById('s3UploadBtn')) {
-      const btn = document.createElement('button');
-      btn.id = 's3UploadBtn';
-      btn.className = 'btn primary';
-      btn.textContent = '결과 전송 (S3 저장)';
-      btn.onclick = uploadToS3;
-      topbarButtons.insertBefore(btn, dlCsv);
+  function makeStimulus(block){
+    const C = "circle", T = "triangle", S = "square";
+    function basicPick(list){
+      return list[Math.floor(Math.random()*list.length)];
+    }
+    if(block===0){
+      const pick = basicPick([T,S]);
+      const isTarget = (pick===S);
+      return { stim: { kind:"basic", shape: pick }, isTarget, targetDesc:"square", renderSvg: svgShape(pick) };
+    }
+    if(block===1){
+      const pick = basicPick([C,T]);
+      const isTarget = (pick===T);
+      return { stim: { kind:"basic", shape: pick }, isTarget, targetDesc:"triangle", renderSvg: svgShape(pick) };
+    }
+    if(block===2){
+      const pick = basicPick([C,T,S]);
+      const isTarget = (pick===T);
+      return { stim: { kind:"basic", shape: pick }, isTarget, targetDesc:"triangle", renderSvg: svgShape(pick) };
+    }
+    if(block===3){
+      const options = [
+        { outer:C, inner:T, isTarget:false },
+        { outer:S, inner:C, isTarget:false },
+        { outer:T, inner:C, isTarget:true }
+      ];
+      const pick = options[Math.floor(Math.random()*options.length)];
+      return {
+        stim: { kind:"compound", outer: pick.outer, inner: pick.inner },
+        isTarget: pick.isTarget,
+        targetDesc:"triangle_outer+circle_inner",
+        renderSvg: svgShape("compound", { outer: pick.outer, inner: pick.inner })
+      };
+    }
+    if(block===4){
+      const pick = basicPick([C,T,S]);
+      const isTarget = (pick===S);
+      return { stim: { kind:"basic", shape: pick }, isTarget, targetDesc:"square", renderSvg: svgShape(pick) };
     }
   }
 
-  // renderResults 호출 시 버튼 추가
-  const originalRenderResults = renderResults;
-  renderResults = function() {
-    originalRenderResults();
-    addS3UploadButton();
-  };
+  function isiFor(block, elapsedSec, blockDurSec){
+    if(block===2){
+      const r = clamp(elapsedSec / Math.max(blockDurSec,1), 0, 1);
+      if(r < 0.333) return randi(CFG.isiB2.pre[0], CFG.isiB2.pre[1]);
+      if(r < 0.666) return randi(CFG.isiB2.mid[0], CFG.isiB2.mid[1]);
+      return randi(CFG.isiB2.post[0], CFG.isiB2.post[1]);
+    }
+    return randi(CFG.isiFixedMin, CFG.isiFixedMax);
+  }
 
-  // =========================================================
-  // Event wiring (기존 그대로 + Results 버튼 활성화 강화)
-  // =========================================================
-  tapBtn.addEventListener("pointerdown", (e)=>{ e.preventDefault(); handleTap(); }, {passive:false});
-  tapBtn.addEventListener("touchstart",  (e)=>{ e.preventDefault(); handleTap(); }, {passive:false});
+  function newTrial(block, trialIndex, stimPack){
+    return {
+      id: crypto.randomUUID(),
+      block,
+      trialIndex,
+      presentedAtMs: nowMs(),
+      blockElapsedSec: 0,
+      stim: stimPack.stim,
+      isTarget: stimPack.isTarget,
+      targetDesc: stimPack.targetDesc,
+      tappedAtMs: null,
+      rtMs: null,
+      isHit: false,
+      isCommission: false,
+      isOmission: false,
+      isAnticipatory: false,
+      extraTapCount: 0,
+      extraTapRts: [],
+    };
+  }
 
-  tapBtn.addEventListener("pointerdown", ()=>{ if(!tapBtn.disabled) tapBtn.classList.add("pressed"); }, {passive:true});
-  tapBtn.addEventListener("pointerup",   ()=>tapBtn.classList.remove("pressed"), {passive:true});
-  tapBtn.addEventListener("pointercancel",()=>tapBtn.classList.remove("pressed"), {passive:true});
-  tapBtn.addEventListener("touchend",    ()=>tapBtn.classList.remove("pressed"), {passive:true});
-  tapBtn.addEventListener("touchcancel", ()=>tapBtn.classList.remove("pressed"), {passive:true});
+  function stopAllTimers(){
+    if(State.blockTimerId) { clearInterval(State.blockTimerId); State.blockTimerId=null; }
+    if(State.stimTimeoutId){ clearTimeout(State.stimTimeoutId); State.stimTimeoutId=null; }
+    if(State.nextStimTimeoutId){ clearTimeout(State.nextStimTimeoutId); State.nextStimTimeoutId=null; }
+    if(State.testTickerId){ clearInterval(State.testTickerId); State.testTickerId=null; }
+  }
 
-  startBtn.onclick = () => {
-    if(State.phase==="running") return;
-    startSequence();
-  };
+  function totalPlannedSec(){
+    return (CFG.dur.b0 + CFG.dur.b1 + CFG.dur.b2 + CFG.dur.b3 + CFG.dur.b4) + (CFG.instructionSec * 5);
+  }
 
-  resetBtn.onclick = () => resetAll();
+  function startGlobalTimer(){
+    State.testStartTs = nowMs();
+    State.testTotalPlannedSec = totalPlannedSec();
+    if(State.testTickerId) clearInterval(State.testTickerId);
+    State.testTickerId = setInterval(()=>{
+      if(State.phase === "idle") return;
+      const elapsedSec = (nowMs() - State.testStartTs)/1000;
+      const remain = Math.max(0, State.testTotalPlannedSec - elapsedSec);
+      timeLeftEl.textContent = fmtMMSS(remain);
+    }, 200);
+    timeLeftEl.textContent = fmtMMSS(State.testTotalPlannedSec);
+  }
 
-  openResultsBtn.onclick = () => {
-    if(!State.hasAnyData) return;
-    renderResults();
-    results.classList.add("show");
-  };
+  function resetAll(){
+    stopAllTimers();
+    hideStimulus();
+    State.phase="idle";
+    State.block=null;
+    State.blockStartTs=0;
+    State.lastPresentedTs=0;
+    State.awaitingTrialId=null;
+    State.trialIndexInBlock=0;
+    State.trials=[];
+    State.baselineRTs=[];
+    State.omissionThresholdMs=CFG.omissionFallbackMs;
+    State.hasAnyData=false;
+    State.testStartTs=0;
+    State.testTotalPlannedSec=0;
+    tapBtn.disabled=true;
+    openResultsBtn.disabled=true;
+    hintEl.style.display="block";
+    hintEl.innerHTML = `Start 후에는 <b>빨간 TAP</b>만 누르세요 (블록 시작 때 규칙 안내가 뜹니다)`;
+    syncStartRowVisibility();
+    syncTimeRowVisibility();
+    timeLeftEl.textContent = "--:--";
+  }
 
-  closeResults.onclick = () => results.classList.remove("show");
+  function startSequence(){
+    resetAll();
+    State.phase="instruction";
+    State.block=0;
+    syncStartRowVisibility();
+    syncTimeRowVisibility();
+    startGlobalTimer();
+    showInstruction(0, ()=> startBlock(0));
+  }
 
-  dlCsv.onclick = () => downloadText("cpt_trials.csv", trialsToCSV());
-  dlJson.onclick = () => downloadText("cpt_trials.json", JSON.stringify({
-    omissionThresholdMs: State.omissionThresholdMs,
-    cfg: CFG,
-    trials: State.trials
-  }, null, 2));
+  function showInstruction(block, onDone){
+    overlay.classList.add("show");
+    ovTitle.textContent = `블록 ${block} 규칙`;
+    ovBody.textContent = blockRuleText(block);
+    let remain = CFG.instructionSec;
+    ovCountdown.textContent = `시작까지 ${remain}초`;
+    const tick = setInterval(()=>{
+      remain -= 1;
+      ovCountdown.textContent = `시작까지 ${remain}초`;
+      if(remain<=0){
+        clearInterval(tick);
+        overlay.classList.remove("show");
+        onDone();
+      }
+    }, 1000);
+    ovSkip.onclick = () => {
+      clearInterval(tick);
+      overlay.classList.remove("show");
+      onDone();
+    };
+  }
 
-  // =========================================================
-  // Initial
-  // =========================================================
-  resetAll();
+  function startBlock(block){
+    if(State.blockTimerId) { clearInterval(State.blockTimerId); State.blockTimerId=null; }
+    if(State.stimTimeoutId){ clearTimeout(State.stimTimeoutId); State.stimTimeoutId=null; }
+    if(State.nextStimTimeoutId){ clearTimeout(State.nextStimTimeoutId); State.nextStimTimeoutId=null; }
+    hideStimulus();
+    State.phase="running";
+    State.block = block;
+    State.blockStartTs = nowMs();
+    State.lastPresentedTs = 0;
+    State.awaitingTrialId = null;
+    State.trialIndexInBlock = 0;
+    syncStartRowVisibility();
+    syncTimeRowVisibility();
+    tapBtn.disabled=false;
+    hintEl.style.display="none";
+    const durSec = blockDurSec(block);
+    State.blockTimerId = setInterval(()=>{
+      const elapsed = (nowMs() - State.blockStartTs)/1000;
+      if(elapsed >= durSec){
+        clearInterval(State.blockTimerId);
+        State.blockTimerId=null;
+        finishBlock(block);
+      }
+    }, 200);
+    scheduleNextStimulus(220);
+  }
 
-  // finishBlock에서 Results 버튼 강제 활성화
-  const originalFinishBlock = finishBlock;
-  finishBlock = function(block) {
-    originalFinishBlock(block);
-    if (State.phase === "finished") {
+  function blockDurSec(block){
+    if(block===0) return CFG.dur.b0;
+    if(block===1) return CFG.dur.b1;
+    if(block===2) return CFG.dur.b2;
+    if(block===3) return CFG.dur.b3;
+    if(block===4) return CFG.dur.b4;
+    return 60;
+  }
+
+  function scheduleNextStimulus(delayMs){
+    if(State.nextStimTimeoutId) clearTimeout(State.nextStimTimeoutId);
+    State.nextStimTimeoutId = setTimeout(()=> presentStimulus(), delayMs);
+  }
+
+  function presentStimulus(){
+    if(State.phase!=="running") return;
+    const block = State.block;
+    const durSec = blockDurSec(block);
+    const elapsedSec = (nowMs() - State.blockStartTs)/1000;
+    const stimPack = makeStimulus(block);
+    State.trialIndexInBlock += 1;
+    const t = newTrial(block, State.trialIndexInBlock, stimPack);
+    t.blockElapsedSec = elapsedSec;
+    State.trials.push(t);
+    State.hasAnyData = true;
+    openResultsBtn.disabled = false;
+    State.lastPresentedTs = t.presentedAtMs;
+    State.awaitingTrialId = t.id;
+    showStimulus(stimPack.renderSvg);
+    State.stimTimeoutId = setTimeout(()=>{ hideStimulus(); }, CFG.stimOnMs);
+    const thr = State.omissionThresholdMs;
+    setTimeout(()=> finalizeOmissionIfNeeded(t.id), thr);
+    const isi = isiFor(block, elapsedSec, durSec);
+    scheduleNextStimulus(isi);
+  }
+
+  function finishBlock(block){
+    stopAllTimers();
+    hideStimulus();
+    tapBtn.disabled=true;
+    if(block===0){
+      computeOmissionThreshold();
+    }
+    if(block < 4){
+      const next = block + 1;
+      State.phase="instruction";
+      State.block = next;
+      syncStartRowVisibility();
+      syncTimeRowVisibility();
+      showInstruction(next, ()=> startBlock(next));
+    } else {
+      State.phase="finished";
+      hintEl.style.display="block";
+      hintEl.innerHTML = `완료 ✅ Results에서 확인`;
+      syncStartRowVisibility();
+      syncTimeRowVisibility();
+      // 결과 화면 자동 열기 + 버튼 활성화
       openResultsBtn.disabled = false;
       openResultsBtn.style.opacity = '1';
       openResultsBtn.style.cursor = 'pointer';
+      renderResults();
+      results.classList.add("show");
+      // S3 업로드 버튼 추가 (결과 화면 topbar에)
+      const topbarButtons = document.querySelector('.topbar > div[style*="display:flex"]');
+      if (topbarButtons && !document.getElementById('s3UploadBtn')) {
+        const btn = document.createElement('button');
+        btn.id = 's3UploadBtn';
+        btn.className = 'btn primary';
+        btn.textContent = '결과 전송 (S3 저장)';
+        btn.onclick = uploadToS3;
+        topbarButtons.insertBefore(btn, dlCsv);
+      }
     }
-  };
-})();
-</script>
-</body>
-</html>
+  }
+
+  function pressedFlash(){
+    if(tapBtn.disabled) return;
+    tapBtn.classList.add("pressed");
+    setTimeout(()=>tapBtn.classList.remove("pressed"), 90);
+  }
+
+  function handleTap(){
+    if(State.phase!=="running") return;
+    if(!State.awaitingTrialId) return;
+    pressedFlash();
+    const id = State.awaitingTrialId;
+    const idx = State.trials.findIndex(x=>x.id===id);
+    if(idx<0) return;
+    const t = State.trials[idx];
+    const rt = nowMs() - t.presentedAtMs;
+    if(t.tappedAtMs !== null){
+      t.extraTapCount += 1;
+      t.extraTapRts.push(rt);
+      return;
+    }
+    t.tappedAtMs = nowMs();
+    t.rtMs = rt;
+    if(rt < CFG.anticipatoryMs){
+      t.isAnticipatory = true;
+      if(!t.isTarget) t.isCommission = true;
+      return;
+    }
+    if(rt > State.omissionThresholdMs){
+      if(t.isTarget) t.isOmission = true;
+      else t.isCommission = true;
+      return;
+    }
+    if(t.isTarget){
+      t.isHit = true;
+      if(t.block===0){
+        State.baselineRTs.push(rt);
+      }
+    } else {
+      t.isCommission = true;
+    }
+  }
+
+  function finalizeOmissionIfNeeded(trialId){
+    const idx = State.trials.findIndex(x=>x.id===trialId);
+    if(idx<0) return;
+    const t = State.trials[idx];
+    if(t.tappedAtMs===null && t.isTarget){
+      t.isOmission = true;
+    }
+  }
+
+  function computeOmissionThreshold(){
+    if(State.baselineRTs.length < CFG.baselineMinN){
+      State.omissionThresholdMs = CFG.omissionFallbackMs;
+      return;
+    }
+    const p90 = percentile(State.baselineRTs, 0.90);
+    const raw = Math.round(p90) + CFG.omissionAddMs;
+    State.omissionThresholdMs = Math.min(raw, CFG.omissionCapMs);
+  }
+
+  function summarizeBlock(block){
+    const ts = State.trials.filter(t=>t.block===block);
+    const total = ts.length;
+    const targets = ts.filter(t=>t.isTarget).length;
+    const nontargets = total - targets;
+    const hits = ts.filter(t=>t.isHit).length;
+    const omissions = ts.filter(t=>t.isOmission).length;
+    const commissions = ts.filter(t=>t.isCommission).length;
+    const anticip = ts.filter(t=>t.isAnticipatory).length;
+    const validRTs = ts
+      .filter(t=>t.isHit && !t.isAnticipatory && typeof t.rtMs==="number")
+      .map(t=>t.rtMs);
+    const m = (validRTs.length ? mean(validRTs) : null);
+    const sd = std(validRTs);
+    const rtv = (m && sd && m>0) ? (sd/m) : null;
+    const hitRate = targets ? hits/targets : null;
+    const omissionRate = targets ? omissions/targets : 0;
+    const commissionRate = nontargets ? commissions/nontargets : 0;
+    const anticipRate = total ? anticip/total : 0;
+    return {
+      block, total, targets, nontargets,
+      hits, omissions, commissions, anticip,
+      hitRate, omissionRate, commissionRate,
+      meanRT: m, rtv,
+      anticipRate,
+      validRTN: validRTs.length
+    };
+  }
+
+  function invalidState(sum){
+    if(sum.targets < CFG.invalid.minTargets) return "insufficient";
+    if(sum.hitRate !== null && sum.hitRate < CFG.invalid.hitRateBelow) return "invalid";
+    if(sum.commissionRate > CFG.invalid.commissionRateAbove) return "invalid";
+    return "valid";
+  }
+
+  function summarizeBinsForBlock(block, binSec){
+    const ts = State.trials.filter(t=>t.block===block);
+    if(!ts.length) return [];
+    const maxT = Math.max(...ts.map(t=>t.blockElapsedSec));
+    const binCount = Math.ceil(maxT / binSec);
+    const out = [];
+    for(let bi=0; bi<binCount; bi++){
+      const start = bi*binSec, end=(bi+1)*binSec;
+      const chunk = ts.filter(t=>t.blockElapsedSec>=start && t.blockElapsedSec<end);
+      if(!chunk.length) continue;
+      const total = chunk.length;
+      const targets = chunk.filter(t=>t.isTarget).length;
+      const nontargets = total-targets;
+      const omissions = chunk.filter(t=>t.isOmission).length;
+      const commissions = chunk.filter(t=>t.isCommission).length;
+      const validRTs = chunk
+        .filter(t=>t.isHit && !t.isAnticipatory && typeof t.rtMs==="number")
+        .map(t=>t.rtMs);
+      const m = validRTs.length ? mean(validRTs) : null;
+      const sd = std(validRTs);
+      const rtv = (m && sd && m>0) ? (sd/m) : null;
+      out.push({
+        startSec: start, endSec: end,
+        omissionRate: targets? omissions/targets : 0,
+        commissionRate: nontargets? commissions/nontargets : 0,
+        meanRT: m, rtv
+      });
+    }
+    return out;
+  }
+
+  function blockOffsetSec(block){
+    if(block===1) return 0;
+    if(block===2) return CFG.dur.b1;
+    if(block===3) return CFG.dur.b1 + CFG.dur.b2;
+    if(block===4) return CFG.dur.b1 + CFG.dur.b2 + CFG.dur.b3;
+    return 0;
+  }
+
+  function summarizeGlobalBins(binSec){
+    const blocks = [1,2,3,4];
+    const all = State.trials.filter(t=>blocks.includes(t.block));
+    if(!all.length) return [];
+    const invalidBlocks = new Set();
+    for(const b of blocks){
+      const s = summarizeBlock(b);
+      if(invalidState(s)==="invalid") invalidBlocks.add(b);
+    }
+    const valid = all.filter(t=>!invalidBlocks.has(t.block));
+    if(!valid.length) return [];
+    const sorted = [...valid].sort((a,b)=>a.presentedAtMs - b.presentedAtMs);
+    const idToGi = new Map();
+    sorted.forEach((t,i)=>idToGi.set(t.id, i+1));
+    const gts = sorted.map(t=>{
+      const gt = blockOffsetSec(t.block) + t.blockElapsedSec;
+      return { gt, t, gi: idToGi.get(t.id) };
+    });
+    const maxT = Math.max(...gts.map(x=>x.gt));
+    const binCount = Math.ceil(maxT / binSec);
+    const out=[];
+    for(let bi=0; bi<binCount; bi++){
+      const start = bi*binSec, end=(bi+1)*binSec;
+      const chunk = gts.filter(x=>x.gt>=start && x.gt<end);
+      if(!chunk.length) continue;
+      const trials = chunk.map(x=>x.t);
+      const total = trials.length;
+      const targets = trials.filter(t=>t.isTarget).length;
+      const nontargets = total-targets;
+      const omissions = trials.filter(t=>t.isOmission).length;
+      const commissions = trials.filter(t=>t.isCommission).length;
+      const validRTs = trials
+        .filter(t=>t.isHit && !t.isAnticipatory && typeof t.rtMs==="number")
+        .map(t=>t.rtMs);
+      const m = validRTs.length ? mean(validRTs) : null;
+      const sd = std(validRTs);
+      const rtv = (m && sd && m>0) ? (sd/m) : null;
+      const gis = chunk.map(x=>x.gi).sort((a,b)=>a-b);
+      const center = (start+end)/2;
+      const nearest = chunk.reduce((best,cur)=>{
+        if(!best) return cur;
+        return (Math.abs(cur.gt-center) < Math.abs(best.gt-center)) ? cur : best;
+      }, null);
+      out.push({
+        startSec: start, endSec: end,
+        meanRT: m,
+        rtv: rtv,
+        omissionRate: targets? omissions/targets : null,
+        commissionRate: nontargets? commissions/nontargets : null,
+        trialIndexMin: gis[0] ?? null,
+        trialIndexMax: gis[gis.length-1] ?? null,
+        nearestTrialIndex: nearest ? nearest.gi : null
+      });
+    }
+    return out;
+  }
+
+  function renderResults(){
+    thrPill.textContent = `Omission threshold: ${Math.round(State.omissionThresholdMs)}ms (baseline p90 + ${CFG.omissionAddMs}, cap ${CFG.omissionCapMs})`;
+    const blocks = [1,2,3,4];
+    let html = "";
+    for(const b of blocks){
+      const s = summarizeBlock(b);
+      const inv = invalidState(s);
+      const tag = inv==="invalid" ? `<span class="pill" style="background:rgba(229,57,53,0.18);border-color:rgba(229,57,53,0.22)">NULL</span>`
+                : inv==="insufficient" ? `<span class="pill" style="background:rgba(180,180,180,0.12)">N/A</span>`
+                : `<span class="pill">OK</span>`;
+      const fmt = (x, d=3)=> (x===null || Number.isNaN(x)) ? "N/A" : x.toFixed(d);
+      const fmtMs = (x)=> (x===null) ? "N/A" : `${x.toFixed(1)} ms`;
+      const showNull = (inv==="invalid");
+      html += `
+        <div class="section" style="margin-top:12px">
+          <h3>블록 ${b} ${tag}</h3>
+          <div class="kv">
+            <div>Trials</div><div>${s.total}</div>
+            <div>Targets / NonTargets</div><div>${s.targets} / ${s.nontargets}</div>
+            <div>Hit rate</div><div>${s.hitRate===null ? "N/A" : fmt(s.hitRate,3)}</div>
+            <div>Omission rate</div><div>${showNull ? "NULL" : fmt(s.omissionRate,3)}</div>
+            <div>Commission rate</div><div>${showNull ? "NULL" : fmt(s.commissionRate,3)}</div>
+            <div>Mean RT</div><div>${showNull ? "NULL" : fmtMs(s.meanRT)}</div>
+            <div>RTV (SD/Mean)</div><div>${showNull ? "NULL" : (s.rtv===null ? "N/A" : fmt(s.rtv,3))}</div>
+            <div>Anticipatory rate</div><div>${showNull ? "NULL" : fmt(s.anticipRate,3)}</div>
+            <div>Valid RT N</div><div>${s.validRTN}</div>
+          </div>
+          ${showNull ? `<div class="muted" style="margin-top:10px">
+            무효 처리: targets≥${CFG.invalid.minTargets} 이면서 (hitRate&lt;${CFG.invalid.hitRateBelow} 또는 commissionRate&gt;${CFG.invalid.commissionRateAbove})
+          </div>` : ``}
+        </div>
+      `;
+    }
+    blockSummaries.innerHTML = html || "-";
+    let binsText = "";
+    for(const b of blocks){
+      const s = summarizeBlock(b);
+      const inv = invalidState(s);
+      binsText += `# Block ${b} bins (${CFG.binSec}s)\n`;
+      if(inv==="invalid"){
+        binsText += `NULL (블록 무효로 bin 집계 제외)\n\n`;
+        continue;
+      }
+      const bins = summarizeBinsForBlock(b, CFG.binSec);
+      if(!bins.length){
+        binsText += `N/A\n\n`;
+        continue;
+      }
+      for(const x of bins){
+        const rt = (x.meanRT===null) ? "NA" : x.meanRT.toFixed(0);
+        const rtv = (x.rtv===null) ? "NA" : x.rtv.toFixed(2);
+        binsText += `t=${String(x.startSec).padStart(3)}~${String(x.endSec).padStart(3)} `
+                  + `Omi=${x.omissionRate.toFixed(2)} Com=${x.commissionRate.toFixed(2)} `
+                  + `RT=${rt} RTV=${rtv}\n`;
+      }
+      binsText += "\n";
+    }
+    blockBins.innerHTML = `<div class="bins">${binsText.replaceAll("<","&lt;")}</div>`;
+    const gbins = summarizeGlobalBins(CFG.binSec);
+    quadCharts.innerHTML = "";
+    if(gbins.length < 2){
+      quadCharts.innerHTML = `<div class="muted" style="margin-top:10px">N/A (유효한 bin이 부족)</div>`;
+      return;
+    }
+    const panels = [
+      { key:"meanRT", title:"Mean RT (ms)", format:(v)=>v.toFixed(0) },
+      { key:"rtv", title:"RTV (SD/Mean)", format:(v)=>v.toFixed(2) },
+      { key:"omissionRate", title:"Omission rate", format:(v)=>v.toFixed(2) },
+      { key:"commissionRate",title:"Commission rate", format:(v)=>v.toFixed(2) },
+    ];
+    for(const p of panels){
+      const card = document.createElement("div");
+      card.className = "chartCard";
+      card.innerHTML = `
+        <div class="chartHead">
+          <div>${p.title}</div>
+          <div style="color:rgba(255,255,255,0.65);font-weight:800">touch/drag</div>
+        </div>
+        <canvas></canvas>
+      `;
+      quadCharts.appendChild(card);
+      const canvas = card.querySelector("canvas");
+      drawLineChart(canvas, gbins.map(b=>b[p.key]), gbins, p.format);
+      attachCrosshair(canvas, gbins, p.key, p.format);
+    }
+  }
+
+  function drawLineChart(canvas, values, gbins, fmt){
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width = Math.floor(w*dpr);
+    canvas.height = Math.floor(h*dpr);
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr,dpr);
+    const vs = values.filter(v => typeof v==="number" && !Number.isNaN(v));
+    if(vs.length < 2){
+      ctx.clearRect(0,0,w,h);
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = "700 12px system-ui";
+      ctx.fillText("N/A", 10, 18);
+      return;
+    }
+    let vmin = Math.min(...vs);
+    let vmax = Math.max(...vs);
+    if(vmin === vmax){ vmin -= 1e-6; vmax += 1e-6; }
+    const pad = 10;
+    const ix = (i)=> pad + (w-2*pad) * (i/(gbins.length-1));
+    const iy = (v)=> {
+      const t = (v - vmin) / (vmax - vmin);
+      return (h-pad) - (h-2*pad) * clamp(t,0,1);
+    };
+    ctx.clearRect(0,0,w,h);
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.lineWidth = 1;
+    for(let r=0;r<=3;r++){
+      const y = pad + (h-2*pad)*(r/3);
+      ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(w-pad,y); ctx.stroke();
+    }
+    for(let c=0;c<=4;c++){
+      const x = pad + (w-2*pad)*(c/4);
+      ctx.beginPath(); ctx.moveTo(x,pad); ctx.lineTo(x,h-pad); ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(255,255,255,0.90)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let started=false;
+    for(let i=0;i<gbins.length;i++){
+      const v = values[i];
+      if(typeof v!=="number" || Number.isNaN(v)) continue;
+      const x = ix(i), y = iy(v);
+      if(!started){ ctx.moveTo(x,y); started=true; }
+      else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    for(let i=gbins.length-1;i>=0;i--){
+      const v = values[i];
+      if(typeof v==="number" && !Number.isNaN(v)){
+        const x=ix(i), y=iy(v);
+        ctx.fillStyle="rgba(255,255,255,0.95)";
+        ctx.beginPath(); ctx.arc(x,y,3.2,0,Math.PI*2); ctx.fill();
+        break;
+      }
+    }
+  }
+
+  function attachCrosshair(canvas, gbins, key, fmt){
+    const handler = (clientX, clientY) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = clamp(clientX - rect.left, 0, rect.width);
+      const idx = Math.round((x/Math.max(rect.width,1)) * (gbins.length-1));
+      const b = gbins[clamp(idx,0,gbins.length-1)];
+      const v = b[key];
+      const valText = (typeof v==="number" && !Number.isNaN(v)) ? fmt(v) : "NA";
+      const range = (b.trialIndexMin && b.trialIndexMax) ? `Trials #${b.trialIndexMin}–#${b.trialIndexMax}` : `Trials NA`;
+      const nearest = (b.nearestTrialIndex) ? `Nearest trial: #${b.nearestTrialIndex}` : `Nearest trial: NA`;
+      tooltip.textContent =
+        `t=${b.startSec}–${b.endSec}s (bin ${idx+1})\n${range}\n${nearest}\nValue: ${valText}`;
+      tooltip.style.left = `${Math.min(clientX+14, window.innerWidth-240)}px`;
+      tooltip.style.top = `${Math.min(clientY+14, window.innerHeight-120)}px`;
+      tooltip.classList.add("show");
+      drawLineChart(canvas, gbins.map(x=>x[key]), gbins, fmt);
+      const ctx = canvas.getContext("2d");
+      const w = canvas.clientWidth, h=canvas.clientHeight;
+      const pad=10;
+      const cx = pad + (w-2*pad) * (idx/(gbins.length-1));
+      ctx.save();
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.strokeStyle="rgba(255,255,255,0.35)";
+      ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(cx, pad); ctx.lineTo(cx, h-pad); ctx.stroke();
+      ctx.restore();
+    };
+    const onMove = (e) => {
+      const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      handler(p.clientX, p.clientY);
+    };
+    const onEnd = () => {
+      tooltip.classList.remove("show");
+      drawLineChart(canvas, gbins.map(x=>x[key]), gbins, fmt);
+    };
+    canvas.addEventListener("pointerdown", onMove, {passive:true});
+    canvas.addEventListener("pointermove", onMove, {passive:true});
+    canvas.addEventListener("pointerup", onEnd, {passive:true});
+    canvas.addEventListener("pointercancel", onEnd, {passive:true});
+    canvas.addEventListener("touchstart", onMove, {passive:true});
+    canvas.addEventListener("touchmove", onMove, {passive:true});
+    canvas.addEventListener("touchend", onEnd, {passive:true});
+  }
+
+  function trialsToCSV(){
+    const header = [
+      "id","block","trialIndex","blockElapsedSec",
+      "stimKind","shape","outer","inner",
+      "isTarget","targetDesc",
+      "rtMs","tapped","hit","omission","commission","anticipatory",
+      "extraTapCount","extraTapRts"
+    ];
+    const rows = [header.join(",")];
+
+    for(const t of State.trials){
+      const stimKind = t.stim.kind;
+      const shape = (t.stim.shape || "");
+      const outer = (t.stim.outer || "");
+      const inner = (t.stim.inner || "");
+      const row = [
+        t.id,
+        t.block,
+        t.trialIndex,
+        t.blockElapsedSec.toFixed(3),
+        stimKind,
+        shape,
+        outer,
+        inner,
+        t.isTarget,
+        t.targetDesc,
+        (t.rtMs===null? "" : t.rtMs.toFixed(2)),
+        (t.tappedAtMs===null? "" : "1"),
+        (t.isHit?1:0),
+        (t.isOmission?1:0),
+        (t.isCommission?1:0),
+        (t.isAnticipatory?1:0),
+        t.extraTapCount,
+        `"${(t.extraTapRts||[]).map(x=>x.toFixed(2)).join("|")}"`
+      ];
+      rows.push(row.join(","));
+    }
