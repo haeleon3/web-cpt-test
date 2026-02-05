@@ -475,11 +475,11 @@
   //    - /api/get-presigned-url (POST) -> { url, key }
   //    - 그 url로 PUT JSON
   // =========================================================
-  async function getPresignedPutUrl(contentType="application/json"){
+  async function getPresignedPutUrl(contentType){
     const res = await fetch("/api/get-presigned-url", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ contentType }),
+      body: JSON.stringify(contentType ? { contentType } : {}),
     });
     const text = await res.text();
     let data = null;
@@ -491,9 +491,9 @@
   }
 
   async function putJsonToS3(presignedUrl, payload){
+    // ✅ 1순위 해결책: content-type 헤더 제거 (서명 불일치 403 방지)
     const res = await fetch(presignedUrl, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     });
     if(!res.ok){
@@ -1417,7 +1417,8 @@
       summary: buildSummary(),
     };
 
-    const { url, key } = await getPresignedPutUrl("application/json");
+    // ✅ 1순위 해결책: presign 요청에서 contentType을 빼서 서명조건 단순화
+    const { url, key } = await getPresignedPutUrl();
     await putJsonToS3(url, payload);
 
     return { ok:true, key };
