@@ -1,0 +1,1488 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <title>Web CPT</title>
+  <style>
+    :root{
+      --bg:#000;
+      --panel: rgba(255,255,255,0.10);
+      --panelStroke: rgba(255,255,255,0.14);
+      --text: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.65);
+      --tap:#e53935;
+      --tapText:#fff;
+      --card: rgba(255,255,255,0.06);
+      --cardStroke: rgba(255,255,255,0.10);
+    }
+    *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html,body{ height:100%; margin:0; background:var(--bg); font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;}
+    body{ overflow:hidden; }
+
+    .wrap{
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: env(safe-area-inset-top) 18px env(safe-area-inset-bottom) 18px;
+    }
+    .app{
+      width:min(900px, 100%);
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      align-items:stretch;
+    }
+
+    /* ======= Global remaining time pill ======= */
+    .timeRow{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      margin-top: 2px;
+      min-height: 34px;
+    }
+    .timePill{
+      display:inline-flex;
+      gap:10px;
+      align-items:center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.9);
+      font-weight: 900;
+      letter-spacing: 0.3px;
+      user-select:none;
+    }
+    .timePill .label{
+      color: rgba(255,255,255,0.70);
+      font-weight: 800;
+      font-size: 13px;
+    }
+    .timePill .clock{
+      font-variant-numeric: tabular-nums;
+      font-size: 18px;
+    }
+    .timeRow.hidden { display:none !important; }
+
+    /* stimulus panel */
+    .panel{
+      width:100%;
+      aspect-ratio: 16 / 8;
+      min-height: 300px;
+      max-height: 420px;
+      background: var(--panel);
+      border: 1px solid var(--panelStroke);
+      border-radius: 22px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      position:relative;
+    }
+    .panelInner{
+      width: 70%;
+      height: 70%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      opacity: 0;
+      transition: opacity 70ms linear;
+      user-select:none;
+      pointer-events:none;
+    }
+    .panelInner.show{ opacity: 1; }
+
+    /* TAP button */
+    .tap{
+      width:100%;
+      height: 96px;
+      background: var(--tap);
+      color: var(--tapText);
+      border:none;
+      border-radius: 18px;
+      font-weight: 900;
+      font-size: 30px;
+      letter-spacing: 1px;
+      box-shadow:
+        0 14px 30px rgba(229,57,53,0.22),
+        inset 0 1px 0 rgba(255,255,255,0.22);
+      transition: transform 70ms ease, filter 70ms ease, box-shadow 70ms ease;
+      touch-action: manipulation;
+    }
+    .tap:disabled{
+      opacity:0.35;
+      box-shadow: none;
+    }
+    /* pressed feedback: 확실하게 */
+    .tap.pressed{
+      transform: translateY(2px) scale(0.995);
+      filter: brightness(0.96);
+      box-shadow:
+        0 8px 18px rgba(229,57,53,0.18),
+        inset 0 2px 8px rgba(0,0,0,0.25);
+    }
+
+    /* overlay screens */
+    .overlay{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: env(safe-area-inset-top) 18px env(safe-area-inset-bottom) 18px;
+      background: rgba(0,0,0,0.72);
+      z-index: 50;
+    }
+    .overlay.show{ display:flex; }
+    .modal{
+      width:min(720px, 100%);
+      background: rgba(20,20,20,0.92);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 18px;
+      padding: 18px;
+      color: var(--text);
+    }
+    .modal h2{
+      margin:0 0 10px 0;
+      font-size: 22px;
+    }
+    .modal p{
+      margin:8px 0;
+      color: var(--muted);
+      line-height: 1.35;
+      white-space: pre-line;
+      font-size: 16px;
+    }
+    .modal .row{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:flex-end;
+      margin-top: 14px;
+    }
+    .btn{
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      font-weight: 800;
+      font-size: 16px;
+    }
+    .btn.primary{
+      background: rgba(229,57,53,0.92);
+      border-color: rgba(229,57,53,0.92);
+    }
+
+    /* results */
+    .results{
+      position:fixed;
+      inset:0;
+      background:#0b0b0b;
+      color:var(--text);
+      display:none;
+      overflow:auto;
+      -webkit-overflow-scrolling: touch;
+      z-index: 60;
+    }
+    .results.show{ display:block; }
+    .results .inner{
+      width:min(980px, 100%);
+      margin: 0 auto;
+      padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom) 22px 16px;
+    }
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      position: sticky;
+      top: 0;
+      padding: 10px 0;
+      background: linear-gradient(#0b0b0b 80%, rgba(11,11,11,0));
+      z-index: 5;
+    }
+    .topbar h1{
+      margin:0;
+      font-size: 22px;
+    }
+    .pill{
+      display:inline-flex;
+      gap:10px;
+      align-items:center;
+      font-weight: 800;
+      font-size: 13px;
+      color: rgba(255,255,255,0.85);
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+    .section{
+      margin-top: 14px;
+      padding: 14px;
+      background: var(--card);
+      border: 1px solid var(--cardStroke);
+      border-radius: 14px;
+    }
+    .section h3{
+      margin: 0 0 10px 0;
+      font-size: 18px;
+    }
+    .kv{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px 10px;
+      font-size: 15px;
+      color: rgba(255,255,255,0.85);
+    }
+    .kv div:nth-child(2n){
+      text-align:right;
+      color: rgba(255,255,255,0.92);
+      font-weight: 700;
+    }
+    .muted{ color: var(--muted); font-size: 13px; line-height: 1.35; }
+
+    .bins{
+      margin-top: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12.5px;
+      color: rgba(255,255,255,0.72);
+      white-space: pre;
+      overflow:auto;
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+
+    .chartGrid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .chartCard{
+      background: rgba(0,0,0,0.30);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .chartHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      font-size: 13px;
+      font-weight: 900;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 6px;
+    }
+    canvas{ width:100%; height: 96px; display:block; border-radius: 10px; background: rgba(255,255,255,0.04); }
+
+    .tooltip{
+      position: fixed;
+      z-index: 80;
+      pointer-events:none;
+      display:none;
+      background: rgba(0,0,0,0.72);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      padding: 8px 10px;
+      color: rgba(255,255,255,0.92);
+      font-size: 12px;
+      line-height: 1.25;
+      white-space: pre-line;
+    }
+    .tooltip.show{ display:block; }
+
+    /* start screen mini */
+    .startRow{
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      align-items:center;
+    }
+    .hint{
+      text-align:center;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.35;
+      margin-top: -4px;
+    }
+
+    /* visibility helper */
+    .hidden{ display:none !important; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="app">
+
+      <!-- 전체 남은시간 (idle 때는 숨김) -->
+      <div class="timeRow hidden" id="timeRow">
+        <div class="timePill">
+          <span class="label">남은 시간</span>
+          <span class="clock" id="timeLeft">--:--</span>
+        </div>
+      </div>
+
+      <!-- Stimulus panel -->
+      <div class="panel">
+        <div id="stimulus" class="panelInner">
+          <!-- SVG inserted here -->
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <button id="tapBtn" class="tap" disabled>TAP</button>
+
+      <div class="hint" id="hint">
+        Start 후에는 <b>빨간 TAP</b>만 누르세요 (블록 시작 때 규칙 안내가 뜹니다)
+      </div>
+
+      <!-- idle에서만 보이게 -->
+      <div class="startRow" id="startRow">
+        <button id="startBtn" class="btn primary">Start</button>
+        <button id="openResultsBtn" class="btn" disabled>Results</button>
+        <button id="resetBtn" class="btn">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instruction overlay -->
+  <div id="overlay" class="overlay">
+    <div class="modal">
+      <h2 id="ovTitle">규칙</h2>
+      <p id="ovBody"></p>
+      <p id="ovCountdown" style="font-weight:900;color:rgba(255,255,255,0.9)"></p>
+      <div class="row">
+        <button id="ovSkip" class="btn">바로 시작</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results" class="results">
+    <div class="inner">
+      <div class="topbar">
+        <h1>Results</h1>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span id="thrPill" class="pill">Omission threshold: -</span>
+          <button id="dlCsv" class="btn">CSV</button>
+          <button id="dlJson" class="btn">JSON</button>
+          <button id="closeResults" class="btn primary">닫기</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>블록별 요약</h3>
+        <div id="blockSummaries" class="muted">-</div>
+      </div>
+
+      <div class="section">
+        <h3>블록별 15s bin</h3>
+        <div id="blockBins" class="muted">-</div>
+      </div>
+
+      <div class="section">
+        <h3>전체 타임라인 4지표 차트 (15s bin)</h3>
+        <div class="muted">터치/드래그하면 해당 bin과 trial 범위를 표시합니다.</div>
+        <div class="chartGrid" id="quadCharts"></div>
+      </div>
+
+      <div class="section">
+        <h3>해석(고정 문구)</h3>
+        <div class="muted">
+          - Omission↑: 타겟 놓침(주의 이탈/각성 저하/지속주의 저하 가능)<br/>
+          - Commission↑: 비타겟 반응(억제 실패/충동/규칙 유지 실패)<br/>
+          - MeanRT↑: 처리속도 저하/조심모드/각성 저하 가능<br/>
+          - RTV↑: 반응 일관성 붕괴(주의 변동/피로/압박 민감)<br/>
+          - Anticipatory↑: 성급/예측반응 신호
+        </div>
+      </div>
+
+      <div style="height:22px"></div>
+    </div>
+  </div>
+
+  <div id="tooltip" class="tooltip"></div>
+
+<script>
+(() => {
+  // =========================================================
+  // Config (네가 말한 웹 CPT 사양)
+  // =========================================================
+  const CFG = {
+    stimOnMs: 180,
+
+    // block durations (sec)
+    dur: { b0: 60, b1: 120, b2: 120, b3: 180, b4: 60 },
+
+    // instruction overlay seconds
+    instructionSec: 10,
+
+    // ISI (ms)
+    isiFixedMin: 1000,
+    isiFixedMax: 1600,
+
+    // Block2 waveform thirds
+    isiB2: {
+      pre:  [1000, 1600],
+      mid:  [700,  1100],
+      post: [1000, 1600],
+    },
+
+    // baseline & omission
+    baselineMinN: 30,
+    omissionAddMs: 250,
+    omissionCapMs: 1200,
+    omissionFallbackMs: 1100,
+    anticipatoryMs: 150,
+
+    // bins
+    binSec: 15,
+
+    // invalidation (너가 말한 “1,3 적용”의 실전형)
+    invalid: {
+      minTargets: 12,
+      hitRateBelow: 0.20,
+      commissionRateAbove: 0.60,
+    }
+  };
+
+  // =========================================================
+  // State
+  // =========================================================
+  const State = {
+    phase: "idle", // idle | instruction | running | finished
+    block: null,   // 0..4
+    blockStartTs: 0,
+    blockTimerId: null,
+    stimTimeoutId: null,
+    nextStimTimeoutId: null,
+
+    lastPresentedTs: 0,
+    awaitingTrialId: null,
+    trialIndexInBlock: 0,
+
+    trials: [],
+    baselineRTs: [],
+    omissionThresholdMs: CFG.omissionFallbackMs,
+
+    // for results navigation
+    hasAnyData: false,
+
+    // 전체 타이머
+    testStartTs: 0,
+    testTotalPlannedSec: 0,
+    testTickerId: null,
+  };
+
+  // =========================================================
+  // DOM
+  // =========================================================
+  const stimulusEl = document.getElementById("stimulus");
+  const tapBtn = document.getElementById("tapBtn");
+  const startBtn = document.getElementById("startBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const openResultsBtn = document.getElementById("openResultsBtn");
+  const hintEl = document.getElementById("hint");
+
+  const startRow = document.getElementById("startRow");
+
+  const overlay = document.getElementById("overlay");
+  const ovTitle = document.getElementById("ovTitle");
+  const ovBody = document.getElementById("ovBody");
+  const ovCountdown = document.getElementById("ovCountdown");
+  const ovSkip = document.getElementById("ovSkip");
+
+  const results = document.getElementById("results");
+  const closeResults = document.getElementById("closeResults");
+  const blockSummaries = document.getElementById("blockSummaries");
+  const blockBins = document.getElementById("blockBins");
+  const quadCharts = document.getElementById("quadCharts");
+  const thrPill = document.getElementById("thrPill");
+  const dlCsv = document.getElementById("dlCsv");
+  const dlJson = document.getElementById("dlJson");
+
+  const tooltip = document.getElementById("tooltip");
+
+  const timeRow = document.getElementById("timeRow");
+  const timeLeftEl = document.getElementById("timeLeft");
+
+  // iOS scroll/zoom 방지(가능한 범위)
+  document.addEventListener("gesturestart", (e)=>e.preventDefault());
+  document.addEventListener("dblclick", (e)=>e.preventDefault());
+
+  // =========================================================
+  // Utils
+  // =========================================================
+  const nowMs = () => performance.now();
+  const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+  const randi = (a,b)=>Math.floor(a + Math.random()*(b-a+1));
+  const mean = (arr)=> arr.reduce((s,x)=>s+x,0)/arr.length;
+  const std = (arr)=>{
+    if(arr.length<2) return null;
+    const m=mean(arr);
+    const v=arr.reduce((s,x)=>s+(x-m)*(x-m),0)/(arr.length-1);
+    return Math.sqrt(v);
+  };
+  const percentile = (xs, p)=>{
+    if(xs.length===0) return null;
+    const s = [...xs].sort((a,b)=>a-b);
+    if(s.length===1) return s[0];
+    const pp = clamp(p,0,1);
+    const idx = (s.length-1)*pp;
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    if(lo===hi) return s[lo];
+    const w = idx-lo;
+    return s[lo]*(1-w) + s[hi]*w;
+  };
+
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function fmtMMSS(sec){
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec/60);
+    const s = sec%60;
+    return `${pad2(m)}:${pad2(s)}`;
+  }
+
+  // startRow: idle일 때만 노출
+  function syncStartRowVisibility(){
+    const show = (State.phase === "idle");
+    startRow.classList.toggle("hidden", !show);
+  }
+
+  // 전체 타이머: idle이면 숨김, 그 외 표시
+  function syncTimeRowVisibility(){
+    const show = (State.phase !== "idle");
+    timeRow.classList.toggle("hidden", !show);
+  }
+
+  // =========================================================
+  // Shapes (SVG)
+  // =========================================================
+  function svgShape(kind, opts={}) {
+    const stroke = opts.stroke || "rgba(255,255,255,0.92)";
+    const strokeW = opts.strokeW || 10;
+    const fill = "none";
+    const size = 260; // viewBox
+    const cx = size/2, cy = size/2;
+
+    const header = `<svg width="100%" height="100%" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
+    const footer = `</svg>`;
+
+    const circle = (r) =>
+      `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" />`;
+
+    const square = (side) => {
+      const x = cx - side/2;
+      const y = cy - side/2;
+      return `<rect x="${x}" y="${y}" width="${side}" height="${side}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" />`;
+    };
+
+    const triangle = (radius) => {
+      const p1 = [cx, cy - radius];
+      const p2 = [cx - radius*0.866, cy + radius*0.5];
+      const p3 = [cx + radius*0.866, cy + radius*0.5];
+      return `<path d="M ${p1[0]} ${p1[1]} L ${p2[0]} ${p2[1]} L ${p3[0]} ${p3[1]} Z"
+        fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" stroke-linejoin="round" />`;
+    };
+
+    function drawBasic(k, scale=1.0){
+      if(k==="circle") return circle(80*scale);
+      if(k==="square") return square(160*scale);
+      if(k==="triangle") return triangle(100*scale);
+      return "";
+    }
+
+    if(kind==="circle") return header + drawBasic("circle",1.0) + footer;
+    if(kind==="square") return header + drawBasic("square",1.0) + footer;
+    if(kind==="triangle") return header + drawBasic("triangle",1.0) + footer;
+
+    if(kind==="compound") {
+      const outer = opts.outer;
+      const inner = opts.inner;
+      return header
+        + drawBasic(outer, 1.0)
+        + `<g opacity="0.95">` + drawBasic(inner, 0.55) + `</g>`
+        + footer;
+    }
+    return header + footer;
+  }
+
+  function showStimulus(svg) {
+    stimulusEl.innerHTML = svg;
+    stimulusEl.classList.add("show");
+  }
+  function hideStimulus() {
+    stimulusEl.classList.remove("show");
+    stimulusEl.innerHTML = "";
+  }
+
+  // =========================================================
+  // Block Rules (네가 지정한 규칙 그대로 + 블록2 문구만 변경)
+  // =========================================================
+  function blockRuleText(block) {
+    switch(block){
+      case 0:
+        return "블록0 (약 1분)\n세모(△) / 네모(□) 중\n네모(□)일 때만 TAP";
+      case 1:
+        return "블록1 (약 2분)\n동그라미(○) / 세모(△) 중\n세모(△)일 때만 TAP";
+      case 2:
+        return "블록2 (약 2분)\n동그라미(○) / 세모(△) / 네모(□) 중\n세모(△)일 때만 TAP\n(도형이 바뀌는 속도가 달라집니다)";
+      case 3:
+        return "블록3 (약 3분)\n자극 간 간격(ISI) 고정 범위\n복합도형 중\n'세모(△) 안에 동그라미(○)'일 때만 TAP";
+      case 4:
+        return "블록4 (쿨다운, 약 1분)\n동그라미(○) / 세모(△) / 네모(□)\n네모(□)일 때만 TAP";
+      default:
+        return "";
+    }
+  }
+
+  // Stimulus generator returns:
+  function makeStimulus(block){
+    const C = "circle", T = "triangle", S = "square";
+
+    function basicPick(list){
+      return list[Math.floor(Math.random()*list.length)];
+    }
+
+    if(block===0){
+      const pick = basicPick([T,S]);
+      const isTarget = (pick===S);
+      return { stim: { kind:"basic", shape: pick }, isTarget, targetDesc:"square", renderSvg: svgShape(pick) };
+    }
+
+    if(block===1){
+      const pick = basicPick([C,T]);
+      const isTarget = (pick===T);
+      return { stim: { kind:"basic", shape: pick }, isTarget, targetDesc:"triangle", renderSvg: svgShape(pick) };
+    }
+
+    if(block===2){
+      const pick = basicPick([C,T,S]);
+      const isTarget = (pick===T);
+      return { stim: { kind:"basic", shape: pick }, isTarget, targetDesc:"triangle", renderSvg: svgShape(pick) };
+    }
+
+    if(block===3){
+      const options = [
+        { outer:C, inner:T, isTarget:false },
+        { outer:S, inner:C, isTarget:false },
+        { outer:T, inner:C, isTarget:true  }
+      ];
+      const pick = options[Math.floor(Math.random()*options.length)];
+      return {
+        stim: { kind:"compound", outer: pick.outer, inner: pick.inner },
+        isTarget: pick.isTarget,
+        targetDesc:"triangle_outer+circle_inner",
+        renderSvg: svgShape("compound", { outer: pick.outer, inner: pick.inner })
+      };
+    }
+
+    if(block===4){
+      const pick = basicPick([C,T,S]);
+      const isTarget = (pick===S);
+      return { stim: { kind:"basic", shape: pick }, isTarget, targetDesc:"square", renderSvg: svgShape(pick) };
+    }
+  }
+
+  function isiFor(block, elapsedSec, blockDurSec){
+    if(block===2){
+      const r = clamp(elapsedSec / Math.max(blockDurSec,1), 0, 1);
+      if(r < 0.333) return randi(CFG.isiB2.pre[0],  CFG.isiB2.pre[1]);
+      if(r < 0.666) return randi(CFG.isiB2.mid[0],  CFG.isiB2.mid[1]);
+      return randi(CFG.isiB2.post[0], CFG.isiB2.post[1]);
+    }
+    return randi(CFG.isiFixedMin, CFG.isiFixedMax);
+  }
+
+  // =========================================================
+  // Trial record
+  // =========================================================
+  function newTrial(block, trialIndex, stimPack){
+    return {
+      id: crypto.randomUUID(),
+      block,
+      trialIndex,
+      presentedAtMs: nowMs(),
+      blockElapsedSec: 0,
+
+      stim: stimPack.stim,
+      isTarget: stimPack.isTarget,
+      targetDesc: stimPack.targetDesc,
+
+      tappedAtMs: null,
+      rtMs: null,
+
+      isHit: false,
+      isCommission: false,
+      isOmission: false,
+      isAnticipatory: false,
+
+      extraTapCount: 0,
+      extraTapRts: [],
+    };
+  }
+
+  // =========================================================
+  // Flow control
+  // =========================================================
+  function stopAllTimers(){
+    if(State.blockTimerId) { clearInterval(State.blockTimerId); State.blockTimerId=null; }
+    if(State.stimTimeoutId){ clearTimeout(State.stimTimeoutId); State.stimTimeoutId=null; }
+    if(State.nextStimTimeoutId){ clearTimeout(State.nextStimTimeoutId); State.nextStimTimeoutId=null; }
+
+    if(State.testTickerId){ clearInterval(State.testTickerId); State.testTickerId=null; }
+  }
+
+  function totalPlannedSec(){
+    // 전체: 블록0~4 + 각 블록 앞 안내 10초(총 5회)
+    return (CFG.dur.b0 + CFG.dur.b1 + CFG.dur.b2 + CFG.dur.b3 + CFG.dur.b4) + (CFG.instructionSec * 5);
+  }
+
+  function startGlobalTimer(){
+    State.testStartTs = nowMs();
+    State.testTotalPlannedSec = totalPlannedSec();
+
+    if(State.testTickerId) clearInterval(State.testTickerId);
+    State.testTickerId = setInterval(()=>{
+      if(State.phase === "idle") return;
+      const elapsedSec = (nowMs() - State.testStartTs)/1000;
+      const remain = Math.max(0, State.testTotalPlannedSec - elapsedSec);
+      timeLeftEl.textContent = fmtMMSS(remain);
+    }, 200);
+
+    // 즉시 1회 반영
+    timeLeftEl.textContent = fmtMMSS(State.testTotalPlannedSec);
+  }
+
+  function resetAll(){
+    stopAllTimers();
+    hideStimulus();
+
+    State.phase="idle";
+    State.block=null;
+    State.blockStartTs=0;
+    State.lastPresentedTs=0;
+    State.awaitingTrialId=null;
+    State.trialIndexInBlock=0;
+    State.trials=[];
+    State.baselineRTs=[];
+    State.omissionThresholdMs=CFG.omissionFallbackMs;
+    State.hasAnyData=false;
+
+    State.testStartTs=0;
+    State.testTotalPlannedSec=0;
+
+    tapBtn.disabled=true;
+    openResultsBtn.disabled=true;
+    hintEl.style.display="block";
+    hintEl.innerHTML = `Start 후에는 <b>빨간 TAP</b>만 누르세요 (블록 시작 때 규칙 안내가 뜹니다)`;
+
+    // UI 토글
+    syncStartRowVisibility();
+    syncTimeRowVisibility();
+    timeLeftEl.textContent = "--:--";
+  }
+
+  function startSequence(){
+    resetAll();
+    State.phase="instruction";
+    State.block=0;
+
+    // UI 토글 + 전체 타이머 시작
+    syncStartRowVisibility();
+    syncTimeRowVisibility();
+    startGlobalTimer();
+
+    showInstruction(0, ()=> startBlock(0));
+  }
+
+  function showInstruction(block, onDone){
+    overlay.classList.add("show");
+    ovTitle.textContent = `블록 ${block} 규칙`;
+    ovBody.textContent = blockRuleText(block);
+
+    let remain = CFG.instructionSec;
+    ovCountdown.textContent = `시작까지 ${remain}초`;
+    const tick = setInterval(()=>{
+      remain -= 1;
+      ovCountdown.textContent = `시작까지 ${remain}초`;
+      if(remain<=0){
+        clearInterval(tick);
+        overlay.classList.remove("show");
+        onDone();
+      }
+    }, 1000);
+
+    ovSkip.onclick = () => {
+      clearInterval(tick);
+      overlay.classList.remove("show");
+      onDone();
+    };
+  }
+
+  function startBlock(block){
+    // block 로직은 그대로
+    if(State.blockTimerId) { clearInterval(State.blockTimerId); State.blockTimerId=null; }
+    if(State.stimTimeoutId){ clearTimeout(State.stimTimeoutId); State.stimTimeoutId=null; }
+    if(State.nextStimTimeoutId){ clearTimeout(State.nextStimTimeoutId); State.nextStimTimeoutId=null; }
+
+    hideStimulus();
+
+    State.phase="running";
+    State.block = block;
+    State.blockStartTs = nowMs();
+    State.lastPresentedTs = 0;
+    State.awaitingTrialId = null;
+    State.trialIndexInBlock = 0;
+
+    // UI: test 중 startRow 숨김 유지, timer 표시 유지
+    syncStartRowVisibility();
+    syncTimeRowVisibility();
+
+    tapBtn.disabled=false;
+    hintEl.style.display="none";
+
+    const durSec = blockDurSec(block);
+    State.blockTimerId = setInterval(()=>{
+      const elapsed = (nowMs() - State.blockStartTs)/1000;
+      if(elapsed >= durSec){
+        clearInterval(State.blockTimerId);
+        State.blockTimerId=null;
+        finishBlock(block);
+      }
+    }, 200);
+
+    scheduleNextStimulus(220);
+  }
+
+  function blockDurSec(block){
+    if(block===0) return CFG.dur.b0;
+    if(block===1) return CFG.dur.b1;
+    if(block===2) return CFG.dur.b2;
+    if(block===3) return CFG.dur.b3;
+    if(block===4) return CFG.dur.b4;
+    return 60;
+  }
+
+  function scheduleNextStimulus(delayMs){
+    if(State.nextStimTimeoutId) clearTimeout(State.nextStimTimeoutId);
+    State.nextStimTimeoutId = setTimeout(()=> presentStimulus(), delayMs);
+  }
+
+  function presentStimulus(){
+    if(State.phase!=="running") return;
+    const block = State.block;
+    const durSec = blockDurSec(block);
+    const elapsedSec = (nowMs() - State.blockStartTs)/1000;
+
+    const stimPack = makeStimulus(block);
+    State.trialIndexInBlock += 1;
+
+    const t = newTrial(block, State.trialIndexInBlock, stimPack);
+    t.blockElapsedSec = elapsedSec;
+
+    State.trials.push(t);
+    State.hasAnyData = true;
+    openResultsBtn.disabled = false;
+
+    State.lastPresentedTs = t.presentedAtMs;
+    State.awaitingTrialId = t.id;
+
+    showStimulus(stimPack.renderSvg);
+
+    State.stimTimeoutId = setTimeout(()=>{ hideStimulus(); }, CFG.stimOnMs);
+
+    const thr = State.omissionThresholdMs;
+    setTimeout(()=> finalizeOmissionIfNeeded(t.id), thr);
+
+    const isi = isiFor(block, elapsedSec, durSec);
+    scheduleNextStimulus(isi);
+  }
+
+  function finishBlock(block){
+    // end block
+    if(State.blockTimerId) { clearInterval(State.blockTimerId); State.blockTimerId=null; }
+    if(State.stimTimeoutId){ clearTimeout(State.stimTimeoutId); State.stimTimeoutId=null; }
+    if(State.nextStimTimeoutId){ clearTimeout(State.nextStimTimeoutId); State.nextStimTimeoutId=null; }
+
+    hideStimulus();
+    tapBtn.disabled=true;
+
+    if(block===0){
+      computeOmissionThreshold();
+    }
+
+    if(block < 4){
+      const next = block + 1;
+      State.phase="instruction";
+      State.block = next;
+
+      // UI 토글 (still non-idle)
+      syncStartRowVisibility();
+      syncTimeRowVisibility();
+
+      showInstruction(next, ()=> startBlock(next));
+    } else {
+      State.phase="finished";
+      hintEl.style.display="block";
+      hintEl.innerHTML = `완료 ✅ Results에서 확인`;
+
+      // finished도 startRow 숨김 유지(요구사항)
+      syncStartRowVisibility();
+      syncTimeRowVisibility();
+
+      openResultsBtn.disabled = false;
+    }
+  }
+
+  // =========================================================
+  // Tap handling (첫 탭만 집계, 추가 탭은 count만 기록)
+  // + pressed feedback
+  // =========================================================
+  function pressedFlash(){
+    if(tapBtn.disabled) return;
+    tapBtn.classList.add("pressed");
+    setTimeout(()=>tapBtn.classList.remove("pressed"), 90);
+  }
+
+  function handleTap(){
+    if(State.phase!=="running") return;
+    if(!State.awaitingTrialId) return;
+
+    pressedFlash();
+
+    const id = State.awaitingTrialId;
+    const idx = State.trials.findIndex(x=>x.id===id);
+    if(idx<0) return;
+
+    const t = State.trials[idx];
+    const rt = nowMs() - t.presentedAtMs;
+
+    if(t.tappedAtMs !== null){
+      t.extraTapCount += 1;
+      t.extraTapRts.push(rt);
+      return;
+    }
+
+    t.tappedAtMs = nowMs();
+    t.rtMs = rt;
+
+    if(rt < CFG.anticipatoryMs){
+      t.isAnticipatory = true;
+      if(!t.isTarget) t.isCommission = true;
+      return;
+    }
+
+    if(rt > State.omissionThresholdMs){
+      if(t.isTarget) t.isOmission = true;
+      else t.isCommission = true;
+      return;
+    }
+
+    if(t.isTarget){
+      t.isHit = true;
+      if(t.block===0){
+        State.baselineRTs.push(rt);
+      }
+    } else {
+      t.isCommission = true;
+    }
+  }
+
+  function finalizeOmissionIfNeeded(trialId){
+    const idx = State.trials.findIndex(x=>x.id===trialId);
+    if(idx<0) return;
+    const t = State.trials[idx];
+    if(t.tappedAtMs===null && t.isTarget){
+      t.isOmission = true;
+    }
+  }
+
+  // =========================================================
+  // Baseline -> omission threshold
+  // =========================================================
+  function computeOmissionThreshold(){
+    if(State.baselineRTs.length < CFG.baselineMinN){
+      State.omissionThresholdMs = CFG.omissionFallbackMs;
+      return;
+    }
+    const p90 = percentile(State.baselineRTs, 0.90);
+    const raw = Math.round(p90) + CFG.omissionAddMs;
+    State.omissionThresholdMs = Math.min(raw, CFG.omissionCapMs);
+  }
+
+  // =========================================================
+  // Results (원본 그대로)
+  // =========================================================
+  function summarizeBlock(block){
+    const ts = State.trials.filter(t=>t.block===block);
+    const total = ts.length;
+    const targets = ts.filter(t=>t.isTarget).length;
+    const nontargets = total - targets;
+
+    const hits = ts.filter(t=>t.isHit).length;
+    const omissions = ts.filter(t=>t.isOmission).length;
+    const commissions = ts.filter(t=>t.isCommission).length;
+    const anticip = ts.filter(t=>t.isAnticipatory).length;
+
+    const validRTs = ts
+      .filter(t=>t.isHit && !t.isAnticipatory && typeof t.rtMs==="number")
+      .map(t=>t.rtMs);
+
+    const m = (validRTs.length ? mean(validRTs) : null);
+    const sd = std(validRTs);
+    const rtv = (m && sd && m>0) ? (sd/m) : null;
+
+    const hitRate = targets ? hits/targets : null;
+    const omissionRate = targets ? omissions/targets : 0;
+    const commissionRate = nontargets ? commissions/nontargets : 0;
+    const anticipRate = total ? anticip/total : 0;
+
+    return {
+      block, total, targets, nontargets,
+      hits, omissions, commissions, anticip,
+      hitRate, omissionRate, commissionRate,
+      meanRT: m, rtv,
+      anticipRate,
+      validRTN: validRTs.length
+    };
+  }
+
+  function invalidState(sum){
+    if(sum.targets < CFG.invalid.minTargets) return "insufficient";
+    if(sum.hitRate !== null && sum.hitRate < CFG.invalid.hitRateBelow) return "invalid";
+    if(sum.commissionRate > CFG.invalid.commissionRateAbove) return "invalid";
+    return "valid";
+  }
+
+  function summarizeBinsForBlock(block, binSec){
+    const ts = State.trials.filter(t=>t.block===block);
+    if(!ts.length) return [];
+    const maxT = Math.max(...ts.map(t=>t.blockElapsedSec));
+    const binCount = Math.ceil(maxT / binSec);
+    const out = [];
+
+    for(let bi=0; bi<binCount; bi++){
+      const start = bi*binSec, end=(bi+1)*binSec;
+      const chunk = ts.filter(t=>t.blockElapsedSec>=start && t.blockElapsedSec<end);
+      if(!chunk.length) continue;
+
+      const total = chunk.length;
+      const targets = chunk.filter(t=>t.isTarget).length;
+      const nontargets = total-targets;
+
+      const omissions = chunk.filter(t=>t.isOmission).length;
+      const commissions = chunk.filter(t=>t.isCommission).length;
+
+      const validRTs = chunk
+        .filter(t=>t.isHit && !t.isAnticipatory && typeof t.rtMs==="number")
+        .map(t=>t.rtMs);
+
+      const m = validRTs.length ? mean(validRTs) : null;
+      const sd = std(validRTs);
+      const rtv = (m && sd && m>0) ? (sd/m) : null;
+
+      out.push({
+        startSec: start, endSec: end,
+        omissionRate: targets? omissions/targets : 0,
+        commissionRate: nontargets? commissions/nontargets : 0,
+        meanRT: m, rtv
+      });
+    }
+    return out;
+  }
+
+  function blockOffsetSec(block){
+    if(block===1) return 0;
+    if(block===2) return CFG.dur.b1;
+    if(block===3) return CFG.dur.b1 + CFG.dur.b2;
+    if(block===4) return CFG.dur.b1 + CFG.dur.b2 + CFG.dur.b3;
+    return 0;
+  }
+
+  function summarizeGlobalBins(binSec){
+    const blocks = [1,2,3,4];
+    const all = State.trials.filter(t=>blocks.includes(t.block));
+    if(!all.length) return [];
+
+    const invalidBlocks = new Set();
+    for(const b of blocks){
+      const s = summarizeBlock(b);
+      if(invalidState(s)==="invalid") invalidBlocks.add(b);
+    }
+    const valid = all.filter(t=>!invalidBlocks.has(t.block));
+    if(!valid.length) return [];
+
+    const sorted = [...valid].sort((a,b)=>a.presentedAtMs - b.presentedAtMs);
+    const idToGi = new Map();
+    sorted.forEach((t,i)=>idToGi.set(t.id, i+1));
+
+    const gts = sorted.map(t=>{
+      const gt = blockOffsetSec(t.block) + t.blockElapsedSec;
+      return { gt, t, gi: idToGi.get(t.id) };
+    });
+
+    const maxT = Math.max(...gts.map(x=>x.gt));
+    const binCount = Math.ceil(maxT / binSec);
+    const out=[];
+
+    for(let bi=0; bi<binCount; bi++){
+      const start = bi*binSec, end=(bi+1)*binSec;
+      const chunk = gts.filter(x=>x.gt>=start && x.gt<end);
+      if(!chunk.length) continue;
+
+      const trials = chunk.map(x=>x.t);
+      const total = trials.length;
+      const targets = trials.filter(t=>t.isTarget).length;
+      const nontargets = total-targets;
+      const omissions = trials.filter(t=>t.isOmission).length;
+      const commissions = trials.filter(t=>t.isCommission).length;
+
+      const validRTs = trials
+        .filter(t=>t.isHit && !t.isAnticipatory && typeof t.rtMs==="number")
+        .map(t=>t.rtMs);
+
+      const m = validRTs.length ? mean(validRTs) : null;
+      const sd = std(validRTs);
+      const rtv = (m && sd && m>0) ? (sd/m) : null;
+
+      const gis = chunk.map(x=>x.gi).sort((a,b)=>a-b);
+      const center = (start+end)/2;
+      const nearest = chunk.reduce((best,cur)=>{
+        if(!best) return cur;
+        return (Math.abs(cur.gt-center) < Math.abs(best.gt-center)) ? cur : best;
+      }, null);
+
+      out.push({
+        startSec: start, endSec: end,
+        meanRT: m,
+        rtv: rtv,
+        omissionRate: targets? omissions/targets : null,
+        commissionRate: nontargets? commissions/nontargets : null,
+        trialIndexMin: gis[0] ?? null,
+        trialIndexMax: gis[gis.length-1] ?? null,
+        nearestTrialIndex: nearest ? nearest.gi : null
+      });
+    }
+    return out;
+  }
+
+  function renderResults(){
+    thrPill.textContent = `Omission threshold: ${Math.round(State.omissionThresholdMs)}ms (baseline p90 + ${CFG.omissionAddMs}, cap ${CFG.omissionCapMs})`;
+
+    const blocks = [1,2,3,4];
+    let html = "";
+    for(const b of blocks){
+      const s = summarizeBlock(b);
+      const inv = invalidState(s);
+
+      const tag = inv==="invalid" ? `<span class="pill" style="background:rgba(229,57,53,0.18);border-color:rgba(229,57,53,0.22)">NULL</span>`
+                : inv==="insufficient" ? `<span class="pill" style="background:rgba(180,180,180,0.12)">N/A</span>`
+                : `<span class="pill">OK</span>`;
+
+      const fmt = (x, d=3)=> (x===null || Number.isNaN(x)) ? "N/A" : x.toFixed(d);
+      const fmtMs = (x)=> (x===null) ? "N/A" : `${x.toFixed(1)} ms`;
+
+      const showNull = (inv==="invalid");
+
+      html += `
+        <div class="section" style="margin-top:12px">
+          <h3>블록 ${b} ${tag}</h3>
+          <div class="kv">
+            <div>Trials</div><div>${s.total}</div>
+            <div>Targets / NonTargets</div><div>${s.targets} / ${s.nontargets}</div>
+            <div>Hit rate</div><div>${s.hitRate===null ? "N/A" : fmt(s.hitRate,3)}</div>
+            <div>Omission rate</div><div>${showNull ? "NULL" : fmt(s.omissionRate,3)}</div>
+            <div>Commission rate</div><div>${showNull ? "NULL" : fmt(s.commissionRate,3)}</div>
+            <div>Mean RT</div><div>${showNull ? "NULL" : fmtMs(s.meanRT)}</div>
+            <div>RTV (SD/Mean)</div><div>${showNull ? "NULL" : (s.rtv===null ? "N/A" : fmt(s.rtv,3))}</div>
+            <div>Anticipatory rate</div><div>${showNull ? "NULL" : fmt(s.anticipRate,3)}</div>
+            <div>Valid RT N</div><div>${s.validRTN}</div>
+          </div>
+          ${showNull ? `<div class="muted" style="margin-top:10px">
+            무효 처리: targets≥${CFG.invalid.minTargets} 이면서 (hitRate&lt;${CFG.invalid.hitRateBelow} 또는 commissionRate&gt;${CFG.invalid.commissionRateAbove})
+          </div>` : ``}
+        </div>
+      `;
+    }
+    blockSummaries.innerHTML = html || "-";
+
+    let binsText = "";
+    for(const b of blocks){
+      const s = summarizeBlock(b);
+      const inv = invalidState(s);
+      binsText += `# Block ${b} bins (${CFG.binSec}s)\n`;
+      if(inv==="invalid"){
+        binsText += `NULL (블록 무효로 bin 집계 제외)\n\n`;
+        continue;
+      }
+      const bins = summarizeBinsForBlock(b, CFG.binSec);
+      if(!bins.length){
+        binsText += `N/A\n\n`;
+        continue;
+      }
+      for(const x of bins){
+        const rt = (x.meanRT===null) ? "NA" : x.meanRT.toFixed(0);
+        const rtv = (x.rtv===null) ? "NA" : x.rtv.toFixed(2);
+        binsText += `t=${String(x.startSec).padStart(3)}~${String(x.endSec).padStart(3)}  `
+                  + `Omi=${x.omissionRate.toFixed(2)}  Com=${x.commissionRate.toFixed(2)}  `
+                  + `RT=${rt}  RTV=${rtv}\n`;
+      }
+      binsText += "\n";
+    }
+    blockBins.innerHTML = `<div class="bins">${binsText.replaceAll("<","&lt;")}</div>`;
+
+    const gbins = summarizeGlobalBins(CFG.binSec);
+    quadCharts.innerHTML = "";
+    if(gbins.length < 2){
+      quadCharts.innerHTML = `<div class="muted" style="margin-top:10px">N/A (유효한 bin이 부족)</div>`;
+      return;
+    }
+
+    const panels = [
+      { key:"meanRT",        title:"Mean RT (ms)",      format:(v)=>v.toFixed(0) },
+      { key:"rtv",           title:"RTV (SD/Mean)",     format:(v)=>v.toFixed(2) },
+      { key:"omissionRate",  title:"Omission rate",     format:(v)=>v.toFixed(2) },
+      { key:"commissionRate",title:"Commission rate",  format:(v)=>v.toFixed(2) },
+    ];
+
+    for(const p of panels){
+      const card = document.createElement("div");
+      card.className = "chartCard";
+      card.innerHTML = `
+        <div class="chartHead">
+          <div>${p.title}</div>
+          <div style="color:rgba(255,255,255,0.65);font-weight:800">touch/drag</div>
+        </div>
+        <canvas></canvas>
+      `;
+      quadCharts.appendChild(card);
+      const canvas = card.querySelector("canvas");
+      drawLineChart(canvas, gbins.map(b=>b[p.key]), gbins, p.format);
+      attachCrosshair(canvas, gbins, p.key, p.format);
+    }
+  }
+
+  // =========================================================
+  // Chart drawing (canvas)
+  // =========================================================
+  function drawLineChart(canvas, values, gbins, fmt){
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width = Math.floor(w*dpr);
+    canvas.height = Math.floor(h*dpr);
+
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr,dpr);
+
+    const vs = values.filter(v => typeof v==="number" && !Number.isNaN(v));
+    if(vs.length < 2){
+      ctx.clearRect(0,0,w,h);
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = "700 12px system-ui";
+      ctx.fillText("N/A", 10, 18);
+      return;
+    }
+
+    let vmin = Math.min(...vs);
+    let vmax = Math.max(...vs);
+    if(vmin === vmax){ vmin -= 1e-6; vmax += 1e-6; }
+
+    const pad = 10;
+    const ix = (i)=> pad + (w-2*pad) * (i/(gbins.length-1));
+    const iy = (v)=> {
+      const t = (v - vmin) / (vmax - vmin);
+      return (h-pad) - (h-2*pad) * clamp(t,0,1);
+    };
+
+    ctx.clearRect(0,0,w,h);
+
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.lineWidth = 1;
+    for(let r=0;r<=3;r++){
+      const y = pad + (h-2*pad)*(r/3);
+      ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(w-pad,y); ctx.stroke();
+    }
+    for(let c=0;c<=4;c++){
+      const x = pad + (w-2*pad)*(c/4);
+      ctx.beginPath(); ctx.moveTo(x,pad); ctx.lineTo(x,h-pad); ctx.stroke();
+    }
+
+    ctx.strokeStyle = "rgba(255,255,255,0.90)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let started=false;
+    for(let i=0;i<gbins.length;i++){
+      const v = values[i];
+      if(typeof v!=="number" || Number.isNaN(v)) continue;
+      const x = ix(i), y = iy(v);
+      if(!started){ ctx.moveTo(x,y); started=true; }
+      else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    for(let i=gbins.length-1;i>=0;i--){
+      const v = values[i];
+      if(typeof v==="number" && !Number.isNaN(v)){
+        const x=ix(i), y=iy(v);
+        ctx.fillStyle="rgba(255,255,255,0.95)";
+        ctx.beginPath(); ctx.arc(x,y,3.2,0,Math.PI*2); ctx.fill();
+        break;
+      }
+    }
+  }
+
+  function attachCrosshair(canvas, gbins, key, fmt){
+    const handler = (clientX, clientY) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = clamp(clientX - rect.left, 0, rect.width);
+      const idx = Math.round((x/Math.max(rect.width,1)) * (gbins.length-1));
+      const b = gbins[clamp(idx,0,gbins.length-1)];
+      const v = b[key];
+      const valText = (typeof v==="number" && !Number.isNaN(v)) ? fmt(v) : "NA";
+      const range = (b.trialIndexMin && b.trialIndexMax) ? `Trials #${b.trialIndexMin}–#${b.trialIndexMax}` : `Trials NA`;
+      const nearest = (b.nearestTrialIndex) ? `Nearest trial: #${b.nearestTrialIndex}` : `Nearest trial: NA`;
+      tooltip.textContent =
+        `t=${b.startSec}–${b.endSec}s (bin ${idx+1})\n${range}\n${nearest}\nValue: ${valText}`;
+      tooltip.style.left = `${Math.min(clientX+14, window.innerWidth-240)}px`;
+      tooltip.style.top  = `${Math.min(clientY+14, window.innerHeight-120)}px`;
+      tooltip.classList.add("show");
+
+      drawLineChart(canvas, gbins.map(x=>x[key]), gbins, fmt);
+      const ctx = canvas.getContext("2d");
+      const w = canvas.clientWidth, h=canvas.clientHeight;
+      const pad=10;
+      const cx = pad + (w-2*pad) * (idx/(gbins.length-1));
+      ctx.save();
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.strokeStyle="rgba(255,255,255,0.35)";
+      ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(cx, pad); ctx.lineTo(cx, h-pad); ctx.stroke();
+      ctx.restore();
+    };
+
+    const onMove = (e) => {
+      const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      handler(p.clientX, p.clientY);
+    };
+    const onEnd = () => {
+      tooltip.classList.remove("show");
+      drawLineChart(canvas, gbins.map(x=>x[key]), gbins, fmt);
+    };
+
+    canvas.addEventListener("pointerdown", onMove, {passive:true});
+    canvas.addEventListener("pointermove", onMove, {passive:true});
+    canvas.addEventListener("pointerup", onEnd, {passive:true});
+    canvas.addEventListener("pointercancel", onEnd, {passive:true});
+
+    canvas.addEventListener("touchstart", onMove, {passive:true});
+    canvas.addEventListener("touchmove", onMove, {passive:true});
+    canvas.addEventListener("touchend", onEnd, {passive:true});
+  }
+
+  // =========================================================
+  // Download
+  // =========================================================
+  function trialsToCSV(){
+    const header = [
+      "id","block","trialIndex","blockElapsedSec",
+      "stimKind","shape","outer","inner",
+      "isTarget","targetDesc",
+      "rtMs","tapped","hit","omission","commission","anticipatory",
+      "extraTapCount","extraTapRts"
+    ];
+    const rows = [header.join(",")];
+
+    for(const t of State.trials){
+      const stimKind = t.stim.kind;
+      const shape = (t.stim.shape || "");
+      const outer = (t.stim.outer || "");
+      const inner = (t.stim.inner || "");
+      const row = [
+        t.id,
+        t.block,
+        t.trialIndex,
+        t.blockElapsedSec.toFixed(3),
+        stimKind,
+        shape,
+        outer,
+        inner,
+        t.isTarget,
+        t.targetDesc,
+        (t.rtMs===null? "" : t.rtMs.toFixed(2)),
+        (t.tappedAtMs===null? "" : "1"),
+        (t.isHit?1:0),
+        (t.isOmission?1:0),
+        (t.isCommission?1:0),
+        (t.isAnticipatory?1:0),
+        t.extraTapCount,
+        `"${(t.extraTapRts||[]).map(x=>x.toFixed(2)).join("|")}"`
+      ];
+      rows.push(row.join(","));
+    }
+    return rows.join("\n");
+  }
+
+  function downloadText(filename, text){
+    const blob = new Blob([text], {type:"text/plain;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href=url;
+    a.download=filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 500);
+  }
+
+  // =========================================================
+  // Event wiring
+  // =========================================================
+  tapBtn.addEventListener("pointerdown", (e)=>{ e.preventDefault(); handleTap(); }, {passive:false});
+  tapBtn.addEventListener("touchstart",  (e)=>{ e.preventDefault(); handleTap(); }, {passive:false});
+
+  // 시각적인 pressed를 더 확실히: 눌렀을 때 즉시
+  tapBtn.addEventListener("pointerdown", ()=>{ if(!tapBtn.disabled) tapBtn.classList.add("pressed"); }, {passive:true});
+  tapBtn.addEventListener("pointerup",   ()=>tapBtn.classList.remove("pressed"), {passive:true});
+  tapBtn.addEventListener("pointercancel",()=>tapBtn.classList.remove("pressed"), {passive:true});
+  tapBtn.addEventListener("touchend",    ()=>tapBtn.classList.remove("pressed"), {passive:true});
+  tapBtn.addEventListener("touchcancel", ()=>tapBtn.classList.remove("pressed"), {passive:true});
+
+  startBtn.onclick = () => {
+    if(State.phase==="running") return;
+    startSequence();
+  };
+
+  resetBtn.onclick = () => resetAll();
+
+  openResultsBtn.onclick = () => {
+    if(!State.hasAnyData) return;
+    renderResults();
+    results.classList.add("show");
+  };
+
+  closeResults.onclick = () => results.classList.remove("show");
+
+  dlCsv.onclick = () => downloadText("cpt_trials.csv", trialsToCSV());
+  dlJson.onclick = () => downloadText("cpt_trials.json", JSON.stringify({
+    omissionThresholdMs: State.omissionThresholdMs,
+    cfg: CFG,
+    trials: State.trials
+  }, null, 2));
+
+  // =========================================================
+  // Initial
+  // =========================================================
+  resetAll();
+})();
+</script>
+</body>
+</html>
