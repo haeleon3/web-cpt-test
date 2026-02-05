@@ -1,246 +1,222 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
-  <title>Web CPT</title>
-  <style>
-    :root {
-      --bg: #000;
-      --panel: rgba(255,255,255,0.10);
-      --panelStroke: rgba(255,255,255,0.14);
-      --text: rgba(255,255,255,0.92);
-      --muted: rgba(255,255,255,0.65);
-      --tap: #e53935;
-      --tapText: #fff;
-      --card: rgba(255,255,255,0.06);
-      --cardStroke: rgba(255,255,255,0.10);
-    }
-    * { box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { height:100%; margin:0; background:var(--bg); font-family:system-ui, sans-serif; }
-    body { overflow:hidden; }
-
-    .wrap { height:100%; display:flex; align-items:center; justify-content:center; padding:env(safe-area-inset-top) 18px env(safe-area-inset-bottom) 18px; }
-    .app { width:min(900px,100%); display:flex; flex-direction:column; gap:18px; }
-
-    .timeRow { display:flex; justify-content:center; align-items:center; margin-top:2px; min-height:34px; }
-    .timePill { display:inline-flex; gap:10px; align-items:center; padding:8px 14px; border-radius:999px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.9); font-weight:900; }
-    .timePill .label { color:rgba(255,255,255,0.70); font-size:13px; }
-    .timePill .clock { font-size:18px; }
-    .timeRow.hidden { display:none !important; }
-
-    .panel { width:100%; aspect-ratio:16/8; min-height:300px; max-height:420px; background:var(--panel); border:1px solid var(--panelStroke); border-radius:22px; display:flex; align-items:center; justify-content:center; position:relative; }
-    .panelInner { width:70%; height:70%; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 70ms linear; }
-    .panelInner.show { opacity:1; }
-
-    .tap { width:100%; height:96px; background:var(--tap); color:var(--tapText); border:none; border-radius:18px; font-weight:900; font-size:30px; box-shadow:0 14px 30px rgba(229,57,53,0.22), inset 0 1px 0 rgba(255,255,255,0.22); transition:transform 70ms ease, filter 70ms ease; }
-    .tap:disabled { opacity:0.35; }
-    .tap.pressed { transform:translateY(2px) scale(0.995); filter:brightness(0.96); }
-
-    .overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.72); z-index:50; }
-    .overlay.show { display:flex; }
-    .modal { width:min(720px,100%); background:rgba(20,20,20,0.92); border:1px solid rgba(255,255,255,0.14); border-radius:18px; padding:18px; color:var(--text); }
-
-    .results { position:fixed; inset:0; background:#0b0b0b; color:var(--text); display:none; overflow:auto; z-index:60; }
-    .results.show { display:block; }
-    .results .inner { width:min(980px,100%); margin:0 auto; padding:16px 16px 22px; }
-    .topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:0; padding:10px 0; background:linear-gradient(#0b0b0b 80%,rgba(11,11,11,0)); z-index:5; }
-    .topbar h1 { margin:0; font-size:22px; }
-    .btn { padding:10px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.08); color:var(--text); font-weight:800; font-size:16px; cursor:pointer; }
-    .btn.primary { background:rgba(229,57,53,0.92); border-color:rgba(229,57,53,0.92); }
-    .btn:disabled { opacity:0.4; cursor:not-allowed; }
-
-    .section { margin-top:14px; padding:14px; background:var(--card); border:1px solid var(--cardStroke); border-radius:14px; }
-    .section h3 { margin:0 0 10px; font-size:18px; }
-    .kv { display:grid; grid-template-columns:1fr auto; gap:8px 10px; font-size:15px; }
-    .kv div:nth-child(2n) { text-align:right; font-weight:700; }
-    .muted { color:var(--muted); font-size:13px; }
-
-    .startRow { display:flex; gap:12px; justify-content:center; }
-    .hint { text-align:center; color:var(--muted); font-size:14px; margin-top:-4px; }
-    .hidden { display:none !important; }
-  </style>
+<meta charset="UTF-8">
+<title>CPT Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  text-align: center;
+  margin-top: 40px;
+}
+#stim {
+  font-size: 72px;
+  height: 120px;
+  margin: 30px;
+}
+button {
+  font-size: 18px;
+  padding: 12px 18px;
+  margin: 6px;
+}
+#hint {
+  margin-top: 16px;
+  color: #444;
+}
+#log {
+  margin-top: 24px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  text-align: left;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid #ddd;
+  padding: 12px;
+  border-radius: 8px;
+}
+</style>
 </head>
+
 <body>
-  <div class="wrap">
-    <div class="app">
-      <div class="timeRow hidden" id="timeRow">
-        <div class="timePill">
-          <span class="label">남은 시간</span>
-          <span class="clock" id="timeLeft">--:--</span>
-        </div>
-      </div>
-      <div class="panel">
-        <div id="stimulus" class="panelInner"></div>
-      </div>
-      <button id="tapBtn" class="tap" disabled>TAP</button>
-      <div class="hint" id="hint">Start 후에는 <b>빨간 TAP</b>만 누르세요</div>
-      <div class="startRow" id="startRow">
-        <button id="startBtn" class="btn primary">Start</button>
-        <button id="resetBtn" class="btn">Reset</button>
-      </div>
-    </div>
-  </div>
 
-  <div id="overlay" class="overlay">
-    <div class="modal">
-      <h2 id="ovTitle">규칙</h2>
-      <p id="ovBody"></p>
-      <p id="ovCountdown"></p>
-      <div class="row">
-        <button id="ovSkip" class="btn">바로 시작</button>
-      </div>
-    </div>
-  </div>
+<h2>CPT Test</h2>
 
-  <div id="results" class="results">
-    <div class="inner">
-      <div class="topbar">
-        <h1>Results</h1>
-        <div style="display:flex;gap:10px;">
-          <span id="thrPill" class="pill">Omission threshold: -</span>
-          <button id="s3Btn" class="btn primary">S3에 저장</button>
-          <button id="closeResults" class="btn primary">닫기</button>
-        </div>
-      </div>
-      <!-- 결과 내용은 네 원본 그대로 -->
-      <div class="section"><h3>블록별 요약</h3><div id="blockSummaries" class="muted">-</div></div>
-      <div class="section"><h3>블록별 15s bin</h3><div id="blockBins" class="muted">-</div></div>
-      <div class="section"><h3>전체 타임라인 4지표 차트</h3><div class="chartGrid" id="quadCharts"></div></div>
-    </div>
-  </div>
+<div>
+  <button id="startBtn">시작</button>
+  <button id="respBtn" disabled>반응 (Space)</button>
+</div>
+
+<div id="stim">+</div>
+<div id="hint">시작 버튼을 누르세요</div>
+<div id="log"></div>
 
 <script>
-(() => {
-  const CFG = {
-    stimOnMs: 180,
-    dur: { b0: 60, b1: 120, b2: 120, b3: 180, b4: 60 },
-    instructionSec: 10,
-    isiFixedMin: 1000,
-    isiFixedMax: 1600,
-    isiB2: { pre: [1000,1600], mid: [700,1100], post: [1000,1600] },
-    baselineMinN: 30,
-    omissionAddMs: 250,
-    omissionCapMs: 1200,
-    omissionFallbackMs: 1100,
-    anticipatoryMs: 150,
-    binSec: 15
-  };
+// =========================
+// 설정
+// =========================
+const CFG = {
+  blocks: 2,
+  trialsPerBlock: 20,
+  targetProb: 0.7,
+  stimMs: 500,
+  isiMs: 800
+};
 
-  const State = {
-    phase: "idle",
-    block: null,
-    blockStartTs: 0,
-    trials: [],
-    baselineRTs: [],
-    omissionThresholdMs: CFG.omissionFallbackMs,
-    hasAnyData: false
-  };
+// =========================
+// 상태
+// =========================
+const State = {
+  phase: "idle",
+  block: 0,
+  trial: 0,
+  trials: [],
+  currentIsTarget: false,
+  stimOnAt: 0
+};
 
-  const els = {
-    stimulus: document.getElementById("stimulus"),
-    tapBtn: document.getElementById("tapBtn"),
-    startBtn: document.getElementById("startBtn"),
-    resetBtn: document.getElementById("resetBtn"),
-    hint: document.getElementById("hint"),
-    startRow: document.getElementById("startRow"),
-    overlay: document.getElementById("overlay"),
-    ovTitle: document.getElementById("ovTitle"),
-    ovBody: document.getElementById("ovBody"),
-    ovCountdown: document.getElementById("ovCountdown"),
-    ovSkip: document.getElementById("ovSkip"),
-    results: document.getElementById("results"),
-    closeResults: document.getElementById("closeResults"),
-    thrPill: document.getElementById("thrPill"),
-    s3Btn: document.getElementById("s3Btn"),
-    timeLeft: document.getElementById("timeLeft")
-  };
+// =========================
+// UI
+// =========================
+const stimEl = document.getElementById("stim");
+const hintEl = document.getElementById("hint");
+const logEl  = document.getElementById("log");
+const startBtn = document.getElementById("startBtn");
+const respBtn  = document.getElementById("respBtn");
 
-  // 간단한 유틸
-  const now = () => performance.now();
-  const randi = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-  const mean = arr => arr.reduce((a,b)=>a+b,0) / arr.length;
-
-  // SVG 모양 (원본 그대로)
-  function getShape(type) {
-    if (type === "circle") return '<svg viewBox="0 0 260 260"><circle cx="130" cy="130" r="80" fill="none" stroke="white" stroke-width="10"/></svg>';
-    if (type === "square") return '<svg viewBox="0 0 260 260"><rect x="50" y="50" width="160" height="160" rx="10" fill="none" stroke="white" stroke-width="10"/></svg>';
-    if (type === "triangle") return '<svg viewBox="0 0 260 260"><polygon points="130,50 50,210 210,210" fill="none" stroke="white" stroke-width="10"/></svg>';
-    return "";
-  }
-
-  function showStim(type) {
-    els.stimulus.innerHTML = getShape(type);
-    els.stimulus.classList.add("show");
-  }
-
-  function hideStim() {
-    els.stimulus.classList.remove("show");
-  }
-
-  function reset() {
-    State.phase = "idle";
-    State.block = null;
-    State.trials = [];
-    State.baselineRTs = [];
-    els.tapBtn.disabled = true;
-    els.hint.style.display = "block";
-    els.startRow.classList.remove("hidden");
-    hideStim();
-  }
-
-  function startTest() {
-    reset();
-    State.phase = "running";
-    els.startRow.classList.add("hidden");
-    els.hint.style.display = "none";
-    els.tapBtn.disabled = false;
-    // 실제로는 네 원본처럼 블록 순서대로 진행해야 함
-    // 여기서는 간단히 테스트용으로 1블록만
-    console.log("테스트 시작!");
-    // 네 원본 로직 넣을 자리
-  }
-
-  els.startBtn.addEventListener("click", () => {
-    console.log("Start 버튼 클릭됨");
-    startTest();
+// =========================
+// Presigned URL → S3 업로드
+// =========================
+async function getPresignedPutUrl(contentType="application/json") {
+  const r = await fetch("/api/get-presigned-url", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ contentType })
   });
+  if (!r.ok) throw new Error("presign_fail_" + r.status);
+  return await r.json(); // { url, key }
+}
 
-  els.resetBtn.addEventListener("click", reset);
-
-  els.s3Btn.addEventListener("click", async () => {
-    if (State.trials.length === 0) {
-      alert("데이터 없음");
-      return;
-    }
-
-    const payload = {
-      time: new Date().toISOString(),
-      trials: State.trials
-    };
-
-    try {
-      const res = await fetch("/api/get-presigned-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType: "application/json" })
-      });
-      const { url } = await res.json();
-
-      await fetch(url, {
-        method: "PUT",
-        body: JSON.stringify(payload),
-        headers: { "Content-Type": "application/json" }
-      });
-
-      alert("S3에 저장 완료!");
-    } catch (e) {
-      alert("업로드 실패: " + e.message);
-    }
+async function putJsonToS3(url, data) {
+  const r = await fetch(url, {
+    method: "PUT",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(data)
   });
+  if (!r.ok) throw new Error("s3_put_" + r.status);
+}
 
-  reset();
-})();
+// =========================
+// CPT 로직
+// =========================
+function randTarget() {
+  return Math.random() < CFG.targetProb;
+}
+
+function showStim(isTarget) {
+  stimEl.textContent = isTarget ? "X" : "O";
+  State.stimOnAt = performance.now();
+}
+
+function clearStim() {
+  stimEl.textContent = "+";
+}
+
+function nextTrial() {
+  if (State.trial >= CFG.trialsPerBlock) {
+    nextBlock();
+    return;
+  }
+
+  State.currentIsTarget = randTarget();
+  showStim(State.currentIsTarget);
+  State.phase = "stim";
+
+  setTimeout(() => {
+    clearStim();
+    State.phase = "isi";
+
+    State.trials.push({
+      block: State.block,
+      trial: State.trial,
+      isTarget: State.currentIsTarget,
+      rt: null,
+      pressed: false
+    });
+
+    State.trial++;
+    setTimeout(nextTrial, CFG.isiMs);
+
+  }, CFG.stimMs);
+}
+
+function nextBlock() {
+  State.block++;
+  if (State.block > CFG.blocks) {
+    finishTest();
+    return;
+  }
+  State.trial = 0;
+  hintEl.textContent = "Block " + State.block + " 시작";
+  setTimeout(nextTrial, 1000);
+}
+
+function recordResponse() {
+  if (State.phase !== "stim") return;
+  const rt = performance.now() - State.stimOnAt;
+  const last = State.trials[State.trials.length - 1];
+  if (last && last.rt === null) {
+    last.rt = Math.round(rt);
+    last.pressed = true;
+  }
+}
+
+// =========================
+// 완료 → S3 업로드
+// =========================
+async function finishTest() {
+  State.phase = "finished";
+  respBtn.disabled = true;
+  hintEl.textContent = "완료 — 업로드 중…";
+
+  const payload = {
+    savedAt: new Date().toISOString(),
+    config: CFG,
+    trials: State.trials,
+    ua: navigator.userAgent
+  };
+
+  try {
+    const { url, key } = await getPresignedPutUrl();
+    await putJsonToS3(url, payload);
+    hintEl.innerHTML = "완료 ✅ S3 저장됨<br>" + key;
+  } catch (e) {
+    hintEl.textContent = "완료 (업로드 실패: " + e.message + ")";
+  }
+
+  logEl.textContent = JSON.stringify(payload, null, 2);
+}
+
+// =========================
+// 이벤트
+// =========================
+startBtn.onclick = () => {
+  State.block = 1;
+  State.trial = 0;
+  State.trials = [];
+  State.phase = "running";
+  respBtn.disabled = false;
+  hintEl.textContent = "시작";
+  nextTrial();
+};
+
+respBtn.onclick = recordResponse;
+
+window.addEventListener("keydown", e => {
+  if (e.code === "Space") recordResponse();
+});
 </script>
+
 </body>
 </html>
