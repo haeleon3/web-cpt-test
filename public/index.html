@@ -39,76 +39,42 @@
 
     .overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding: env(safe-area-inset-top) 18px env(safe-area-inset-bottom) 18px; background: rgba(0,0,0,0.72); z-index: 50; }
     .overlay.show{ display:flex; }
-    .modal{ width:min(720px, 100%); background: rgba(20,20,20,0.92); border: 1px solid rgba(255,255,255,0.14); border-radius: 18px; padding: 18px; color: var(--text); }
+    .modal{ width:min(720px, 100%); background: rgba(20,20,20,0.92); border: 1px solid rgba(255,255,255,0.14); border-radius: 18px; padding: 18px; color: var(--text); text-align:center; }
     .modal h2{ margin:0 0 10px 0; font-size: 22px; }
-    .modal p{ margin:8px 0; color: var(--muted); line-height: 1.35; white-space: pre-line; font-size: 16px; }
-    .modal .row{ display:flex; gap:12px; align-items:center; justify-content:flex-end; margin-top: 14px; }
-    .btn{ padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.08); color: var(--text); font-weight: 800; font-size: 16px; cursor:pointer; }
+    .modal p{ margin:8px 0; color: var(--muted); line-height: 1.35; font-size: 16px; }
+    .modal .row{ display:flex; gap:12px; align-items:center; justify-content:center; margin-top: 20px; flex-wrap:wrap; }
+    .btn{ padding: 12px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: var(--text); font-weight: 800; font-size: 16px; cursor:pointer; }
     .btn.primary{ background: rgba(229,57,53,0.92); border-color: rgba(229,57,53,0.92); }
     .btn:disabled{ opacity:0.4; cursor:not-allowed; }
 
-    .results{ position:fixed; inset:0; background:#0b0b0b; color:var(--text); display:none; overflow:auto; -webkit-overflow-scrolling: touch; z-index: 60; }
-    .results.show{ display:block; }
-    .results .inner{ width:min(980px, 100%); margin: 0 auto; padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom) 22px 16px; }
-    .topbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; position: sticky; top: 0; padding: 10px 0; background: linear-gradient(#0b0b0b 80%, rgba(11,11,11,0)); z-index: 5; }
-    .topbar h1{ margin:0; font-size: 22px; }
-    .pill{ display:inline-flex; gap:10px; align-items:center; font-weight: 800; font-size: 13px; color: rgba(255,255,255,0.85); padding: 8px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.10); }
+    label{ display:block; margin: 20px 0 8px; font-size: 16px; color: var(--text); }
+    select, input[type="number"]{ width:100%; max-width:300px; padding:12px; font-size:18px; border-radius:12px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:white; margin:0 auto; display:block; }
+    .gender-row{ display:flex; gap:20px; justify-content:center; margin:20px 0; flex-wrap:wrap; }
+    .gender-row label{ display:flex; align-items:center; gap:8px; font-size:16px; cursor:pointer; }
+    .error{ color:#ff6b6b; font-size:14px; margin-top:10px; display:none; }
 
-    .section{ margin-top: 14px; padding: 14px; background: var(--card); border: 1px solid var(--cardStroke); border-radius: 14px; }
-    .section h3{ margin: 0 0 10px 0; font-size: 18px; }
-    .kv{ display:grid; grid-template-columns: 1fr auto; gap: 8px 10px; font-size: 15px; color: rgba(255,255,255,0.85); }
-    .kv div:nth-child(2n){ text-align:right; color: rgba(255,255,255,0.92); font-weight: 700; }
-    .muted{ color: var(--muted); font-size: 13px; line-height: 1.35; }
-    .bins{ margin-top: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: rgba(255,255,255,0.72); white-space: pre; overflow:auto; padding: 10px; border-radius: 12px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.10); }
-    .chartGrid{ display:grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
-    .chartCard{ background: rgba(0,0,0,0.30); border: 1px solid rgba(255,255,255,0.10); border-radius: 12px; padding: 10px; }
-    .chartHead{ display:flex; align-items:center; justify-content:space-between; font-size: 13px; font-weight: 900; color: rgba(255,255,255,0.85); margin-bottom: 6px; }
-    canvas{ width:100%; height: 96px; display:block; border-radius: 10px; background: rgba(255,255,255,0.04); }
-    .tooltip{ position: fixed; z-index: 80; pointer-events:none; display:none; background: rgba(0,0,0,0.72); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 8px 10px; color: rgba(255,255,255,0.92); font-size: 12px; line-height: 1.25; white-space: pre-line; }
+    .results{ position:fixed; inset:0; background:#0b0b0b; color:var(--text); display:none; overflow:auto; z-index:60; }
+    .results.show{ display:block; }
+    .results .inner{ width:min(980px,100%); margin:0 auto; padding: env(safe-area-inset-top) 16px 22px; }
+    .topbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:0; padding:10px 0; background:linear-gradient(#0b0b0b 80%,rgba(11,11,11,0)); z-index:5; }
+    .topbar h1{ margin:0; font-size:22px; }
+    .pill{ display:inline-flex; gap:10px; align-items:center; font-weight:800; font-size:13px; color:rgba(255,255,255,0.85); padding:8px 10px; border-radius:999px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.10); }
+    .section{ margin-top:14px; padding:14px; background:var(--card); border:1px solid var(--cardStroke); border-radius:14px; }
+    .section h3{ margin:0 0 10px 0; font-size:18px; }
+    .kv{ display:grid; grid-template-columns:1fr auto; gap:8px 10px; font-size:15px; color:rgba(255,255,255,0.85); }
+    .kv div:nth-child(2n){ text-align:right; color:rgba(255,255,255,0.92); font-weight:700; }
+    .muted{ color:var(--muted); font-size:13px; line-height:1.35; }
+    .bins{ margin-top:10px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; color:rgba(255,255,255,0.72); white-space:pre; overflow:auto; padding:10px; border-radius:12px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.10); }
+    .chartGrid{ display:grid; grid-template-columns:1fr; gap:10px; margin-top:10px; }
+    .chartCard{ background:rgba(0,0,0,0.30); border:1px solid rgba(255,255,255,0.10); border-radius:12px; padding:10px; }
+    .chartHead{ display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:900; color:rgba(255,255,255,0.85); margin-bottom:6px; }
+    canvas{ width:100%; height:96px; display:block; border-radius:10px; background:rgba(255,255,255,0.04); }
+    .tooltip{ position:fixed; z-index:80; pointer-events:none; display:none; background:rgba(0,0,0,0.72); border:1px solid rgba(255,255,255,0.18); border-radius:10px; padding:8px 10px; color:rgba(255,255,255,0.92); font-size:12px; line-height:1.25; white-space:pre-line; }
     .tooltip.show{ display:block; }
 
     .startRow{ display:flex; gap:12px; justify-content:center; align-items:center; }
-    .hint{ text-align:center; color: var(--muted); font-size: 14px; line-height: 1.35; margin-top: -4px; }
+    .hint{ text-align:center; color:var(--muted); font-size:14px; line-height:1.35; margin-top:-4px; }
     .hidden{ display:none !important; }
-
-    /* 새로 추가: 완료 후 정보 입력 모달 스타일 */
-    #finishModal .modal{
-      max-width: 420px;
-      text-align: center;
-    }
-    #finishModal label{
-      display: block;
-      margin: 16px 0 8px;
-      font-size: 16px;
-      color: var(--text);
-    }
-    #finishModal select, #finishModal input[type="number"]{
-      width: 100%;
-      padding: 12px;
-      font-size: 18px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.2);
-      background: rgba(255,255,255,0.05);
-      color: white;
-    }
-    #finishModal .gender-row{
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      margin: 20px 0;
-    }
-    #finishModal .gender-row label{
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 16px;
-    }
-    #finishModal .error{
-      color: #ff6b6b;
-      font-size: 14px;
-      margin-top: 8px;
-      display: none;
-    }
   </style>
 </head>
 <body>
@@ -185,7 +151,7 @@
     </div>
   </div>
 
-  <!-- 새로 추가: 완료 후 나이/성별 입력 모달 -->
+  <!-- 완료 후 정보 입력 모달 -->
   <div id="finishModal" class="overlay">
     <div class="modal">
       <h2>테스트 완료!</h2>
@@ -222,7 +188,7 @@
 <script>
 (() => {
   // =========================================================
-  // Config & State (기존 그대로)
+  // Config & State
   // =========================================================
   const CFG = {
     stimOnMs: 180,
@@ -260,7 +226,7 @@
   };
 
   // =========================================================
-  // DOM 요소들
+  // DOM
   // =========================================================
   const stimulusEl = document.getElementById("stimulus");
   const tapBtn = document.getElementById("tapBtn");
@@ -285,7 +251,7 @@
   const timeRow = document.getElementById("timeRow");
   const timeLeftEl = document.getElementById("timeLeft");
 
-  // 새로 추가: 완료 모달 요소
+  // 완료 모달
   const finishModal = document.getElementById("finishModal");
   const ageSelect = document.getElementById("ageSelect");
   const genderRadios = document.querySelectorAll('input[name="gender"]');
@@ -293,13 +259,51 @@
   const finishError = document.getElementById("finishError");
 
   // =========================================================
-  // Utils & 기존 함수들 (생략 없이 그대로)
+  // Utils (기존 그대로)
   // =========================================================
-  // ... (이 부분은 네 원본 코드와 동일하게 유지. 여기서는 생략해서 길이 줄임)
-  // 실제로는 mean, std, percentile, fmtMMSS, svgShape, blockRuleText, makeStimulus 등 기존 함수 모두 그대로 두세요.
+  const nowMs = () => performance.now();
+  const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+  const randi = (a,b)=>Math.floor(a + Math.random()*(b-a+1));
+  const mean = (arr)=> arr.reduce((s,x)=>s+x,0)/arr.length;
+  const std = (arr)=>{
+    if(arr.length<2) return null;
+    const m=mean(arr);
+    const v=arr.reduce((s,x)=>s+(x-m)*(x-m),0)/(arr.length-1);
+    return Math.sqrt(v);
+  };
+  const percentile = (xs, p)=>{
+    if(xs.length===0) return null;
+    const s = [...xs].sort((a,b)=>a-b);
+    if(s.length===1) return s[0];
+    const pp = clamp(p,0,1);
+    const idx = (s.length-1)*pp;
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    if(lo===hi) return s[lo];
+    const w = idx-lo;
+    return s[lo]*(1-w) + s[hi]*w;
+  };
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function fmtMMSS(sec){
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec/60);
+    const s = sec%60;
+    return `${pad2(m)}:${pad2(s)}`;
+  }
+
+  function syncStartRowVisibility(){
+    const show = (State.phase === "idle");
+    startRow.classList.toggle("hidden", !show);
+  }
+
+  function syncTimeRowVisibility(){
+    const show = (State.phase !== "idle");
+    timeRow.classList.toggle("hidden", !show);
+  }
+
+  // Shapes, blockRuleText, makeStimulus, isiFor, newTrial, stopAllTimers 등은 그대로 유지 (생략)
 
   // =========================================================
-  // S3 업로드 함수 (Vercel API Route 사용)
+  // S3 업로드 함수
   // =========================================================
   const API_ENDPOINT = '/api/get-presigned-url';
 
@@ -352,14 +356,13 @@
   }
 
   // =========================================================
-  // 완료 후 입력 모달 열기 & 버튼 활성화 로직
+  // 완료 모달 제어
   // =========================================================
   function showFinishModal() {
     finishModal.classList.add("show");
     submitFinishBtn.disabled = true;
     finishError.style.display = 'none';
 
-    // 입력값 변경 시 버튼 활성화 체크
     const checkInputs = () => {
       const age = ageSelect.value;
       const gender = document.querySelector('input[name="gender"]:checked');
@@ -367,9 +370,8 @@
     };
 
     ageSelect.addEventListener('change', checkInputs);
-    genderRadios.forEach(radio => radio.addEventListener('change', checkInputs));
+    genderRadios.forEach(r => r.addEventListener('change', checkInputs));
 
-    // 결과 확인하기 버튼 클릭
     submitFinishBtn.onclick = async () => {
       const success = await submitResultsToS3();
       if (success) {
@@ -380,51 +382,57 @@
     };
   }
 
-  // finishBlock에서 마지막 블록 끝날 때 모달 띄우기
+  // =========================================================
+  // finishBlock 수정 (마지막 블록 끝나면 모달 띄움)
+  // =========================================================
   function finishBlock(block) {
-    if(State.blockTimerId) { clearInterval(State.blockTimerId); State.blockTimerId=null; }
-    if(State.stimTimeoutId){ clearTimeout(State.stimTimeoutId); State.stimTimeoutId=null; }
-    if(State.nextStimTimeoutId){ clearTimeout(State.nextStimTimeoutId); State.nextStimTimeoutId=null; }
+    stopAllTimers();
     hideStimulus();
-    tapBtn.disabled=true;
+    tapBtn.disabled = true;
 
-    if(block===0){
-      computeOmissionThreshold();
-    }
+    if(block===0) computeOmissionThreshold();
 
     if(block < 4){
       const next = block + 1;
-      State.phase="instruction";
+      State.phase = "instruction";
       State.block = next;
       syncStartRowVisibility();
       syncTimeRowVisibility();
       showInstruction(next, ()=> startBlock(next));
     } else {
-      State.phase="finished";
-      hintEl.style.display="block";
+      State.phase = "finished";
+      hintEl.style.display = "block";
       hintEl.innerHTML = `완료 ✅ 정보를 입력해주세요`;
       syncStartRowVisibility();
       syncTimeRowVisibility();
 
-      // 기존 Results 버튼 숨기기
-      openResultsBtn.style.display = "none";
+      // 기존 Results 버튼 숨김
+      document.getElementById("openResultsBtn")?.style.display = "none";
 
-      // 완료 모달 띄우기
+      // 완료 모달 열기
       showFinishModal();
     }
   }
 
   // =========================================================
-  // Initial & Event wiring (기존 그대로 + openResultsBtn 숨김)
+  // Initial & Event wiring
   // =========================================================
   resetAll();
 
-  // openResultsBtn은 이제 사용 안 함 (모달로 대체)
-  openResultsBtn.style.display = "none";
+  // Start 버튼 이벤트 (강제 재설정)
+  startBtn.onclick = () => {
+    if (State.phase === "running") return;
+    startSequence();
+  };
 
-  // 나머지 이벤트 바인딩은 그대로
-  tapBtn.addEventListener("pointerdown", (e)=>{ e.preventDefault(); handleTap(); }, {passive:false});
-  // ... (기존 이벤트들 모두 유지)
+  resetBtn.onclick = () => resetAll();
+
+  // 나머지 이벤트 (tapBtn, ovSkip 등)은 그대로 유지
+
+  // window load 시 버튼 초기화 (필요시)
+  window.addEventListener('load', () => {
+    // 필요하면 추가 UI 조정
+  });
 
 })();
 </script>
