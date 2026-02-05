@@ -409,7 +409,7 @@
   <!-- Demographics sheet -->
   <div id="demoSheet" class="sheet">
     <div class="modal">
-      <h2>성별 / 연령대</h2>
+      <h2>성별 / 나이</h2>
       <p style="font-size:16px;font-weight:800;line-height:1.35">
         결과 확인을 누르면 데이터가 서버로 제출되고, 그 다음 결과 화면이 열립니다.
       </p>
@@ -417,7 +417,7 @@
       <div style="margin-top:12px;font-weight:900;color:rgba(255,255,255,0.88)">성별</div>
       <div class="chips" id="genderChips"></div>
 
-      <div style="margin-top:14px;font-weight:900;color:rgba(255,255,255,0.88)">연령대</div>
+      <div style="margin-top:14px;font-weight:900;color:rgba(255,255,255,0.88)">나이 (만)</div>
       <div class="chips" id="ageChips"></div>
 
       <div id="submitStatus" class="statusLine"></div>
@@ -1417,7 +1417,6 @@
       summary: buildSummary(),
     };
 
-    // ✅ 1순위 해결책: presign 요청에서 contentType을 빼서 서명조건 단순화
     const { url, key } = await getPresignedPutUrl();
     await putJsonToS3(url, payload);
 
@@ -1425,20 +1424,22 @@
   }
 
   // =========================================================
-  // Demo UI
+  // Demo UI (✅ 최소 변경: 칩 UI 유지, 옵션만 교체)
   // =========================================================
+  const AGE_MIN = 5;
+  const AGE_MAX = 70;
+
+  // ✅ 선택안함 제거
   const GENDERS = [
     { label:"남성", value:"male" },
     { label:"여성", value:"female" },
-    { label:"선택안함", value:"na" },
   ];
-  const AGES = [
-    { label:"0~10살", value:"0-10" },
-    { label:"10~20살", value:"10-20" },
-    { label:"20~30살", value:"20-30" },
-    { label:"30~40살", value:"30-40" },
-    { label:"40~50살", value:"40-50" },
-  ];
+
+  // ✅ 5~70 개별 나이 생성 (타이핑 없음)
+  const AGES = Array.from({length: (AGE_MAX-AGE_MIN+1)}, (_,i)=>{
+    const age = AGE_MIN + i;
+    return { label: `${age}`, value: String(age) };
+  });
 
   function renderChips(container, items, onPick){
     container.innerHTML = "";
@@ -1451,9 +1452,11 @@
     }
   }
 
-  function setChipOn(container, value){
-    [...container.querySelectorAll(".chip")].forEach((el, i)=>{
-      const v = (container===genderChips ? GENDERS[i].value : AGES[i].value);
+  // ✅ items 기반으로 on 표시 (인덱스 의존 제거: 안정)
+  function setChipOnByItems(container, items, value){
+    const chips = [...container.querySelectorAll(".chip")];
+    chips.forEach((el, i)=>{
+      const v = items[i]?.value;
       el.classList.toggle("on", v===value);
     });
   }
@@ -1504,12 +1507,13 @@
   // demo chips
   renderChips(genderChips, GENDERS, (v)=>{
     State.demo.gender = v;
-    setChipOn(genderChips, v);
+    setChipOnByItems(genderChips, GENDERS, v);
     updateSubmitButton();
   });
+
   renderChips(ageChips, AGES, (v)=>{
-    State.demo.age = v;
-    setChipOn(ageChips, v);
+    State.demo.age = v; // "5" ~ "70"
+    setChipOnByItems(ageChips, AGES, v);
     updateSubmitButton();
   });
 
@@ -1536,7 +1540,7 @@
 
     }catch(err){
       submitStatus.textContent = `제출 실패 ❌ (${err?.message || err})`;
-      submitStatus.className = "statusLine bad";
+      submitStatus.classListName = "statusLine bad";
       submitAndOpen.disabled = false;
     }
   };
