@@ -41,7 +41,6 @@
       align-items:stretch;
     }
 
-    /* top strip */
     .topStrip{
       display:flex;
       justify-content:space-between;
@@ -68,7 +67,6 @@
       font-weight: 900;
     }
 
-    /* stimulus panel */
     .panel{
       width:100%;
       aspect-ratio: 16 / 8;
@@ -84,8 +82,8 @@
       overflow:hidden;
     }
     .panelInner{
-      width: 78%;
-      height: 78%;
+      width: 70%;
+      height: 70%;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -93,11 +91,9 @@
       transition: opacity 70ms linear;
       user-select:none;
       pointer-events:none;
-      transform: translateZ(0);
     }
     .panelInner.show{ opacity: 1; }
 
-    /* TAP button */
     .tap{
       width:100%;
       height: 96px;
@@ -114,7 +110,6 @@
     .tap:active{ transform: scale(0.985); filter: brightness(1.05); }
     .tap:disabled{ opacity:0.35; }
 
-    /* bottom idle controls */
     .idleControls{
       display:flex;
       flex-direction:column;
@@ -133,7 +128,6 @@
       align-items:center;
     }
 
-    /* overlay screens */
     .overlay{
       position:fixed;
       inset:0;
@@ -154,7 +148,6 @@
       color: var(--text);
     }
     .modal h2{ margin:0 0 10px 0; font-size: 22px; }
-
     .modal p{
       margin:8px 0;
       color: var(--muted);
@@ -163,7 +156,6 @@
       font-size: 24px;
       font-weight: 850;
     }
-
     .modal .row{
       display:flex;
       gap:12px;
@@ -188,7 +180,6 @@
     }
     .btn:disabled{ opacity:0.45; }
 
-    /* demographic sheet */
     .sheet{
       position:fixed;
       inset:0;
@@ -225,7 +216,6 @@
       border-color: var(--chipOnStroke);
     }
 
-    /* age dropdown */
     .selectWrap{
       margin-top: 10px;
       display:flex;
@@ -262,7 +252,6 @@
     .statusLine.ok{ color: var(--ok); }
     .statusLine.bad{ color: var(--bad); }
 
-    /* results */
     .results{
       position:fixed;
       inset:0;
@@ -388,7 +377,7 @@
       font-size: 12px;
       line-height: 1.25;
       white-space: pre-line;
-      max-width: 240px;
+      max-width: 260px;
     }
     .tooltip.show{ display:block; }
   </style>
@@ -421,7 +410,6 @@
     </div>
   </div>
 
-  <!-- Instruction overlay -->
   <div id="overlay" class="overlay">
     <div class="modal">
       <h2 id="ovTitle">규칙</h2>
@@ -433,7 +421,6 @@
     </div>
   </div>
 
-  <!-- Demographics sheet -->
   <div id="demoSheet" class="sheet">
     <div class="modal">
       <h2>성별 / 나이</h2>
@@ -458,7 +445,6 @@
     </div>
   </div>
 
-  <!-- Results -->
   <div id="results" class="results">
     <div class="inner">
       <div class="topbar">
@@ -475,8 +461,8 @@
       </div>
 
       <div class="section">
-        <h3>전체 타임라인 4지표 차트 (15s bin)</h3>
-        <div class="muted">터치/드래그하면 같은 시간대(x축)가 4개 차트에서 함께 움직입니다.</div>
+        <h3>전체 타임라인 차트 (15s bin)</h3>
+        <div class="muted">터치/드래그하면 같은 시간대(x축)가 모든 차트에서 함께 움직입니다.</div>
         <div class="chartGrid" id="quadCharts"></div>
       </div>
 
@@ -485,9 +471,10 @@
         <div class="muted">
           - Omission↑: 타겟 놓침(주의 이탈/각성 저하/지속주의 저하 가능)<br/>
           - Commission↑: 비타겟 반응(억제 실패/충동/규칙 유지 실패)<br/>
-          - MeanRT↑: 처리속도 저하/조심모드/각성 저하 가능<br/>
+          - Mean RT↑: 처리속도 저하/조심모드/각성 저하 가능<br/>
           - RTV↑: 반응 일관성 붕괴(주의 변동/피로/압박 민감)<br/>
-          - Anticipatory↑: 성급/예측반응 신호
+          - Anticipatory↑: 성급/예측반응 신호<br/>
+          - All responses RT: “눌린 trial” 전체의 RT 평균(정상반응+오반응 포함). 납득용 시각화에 좋지만, 해석은 Hit RT와 분리하는 게 안전합니다.
         </div>
       </div>
 
@@ -499,9 +486,6 @@
 
 <script>
 (() => {
-  // =========================================================
-  // ✅ Presigned URL 기반 S3 업로드 (Vercel API Route 사용)
-  // =========================================================
   async function getPresignedPutUrl(contentType){
     const res = await fetch("/api/get-presigned-url", {
       method: "POST",
@@ -518,7 +502,6 @@
   }
 
   async function putJsonToS3(presignedUrl, payload){
-    // ✅ content-type 헤더 제거 (서명 불일치 403 방지)
     const res = await fetch(presignedUrl, {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -528,9 +511,6 @@
     }
   }
 
-  // =========================================================
-  // Config
-  // =========================================================
   const CFG = {
     stimOnMs: 180,
     dur: { b0: 60, b1: 120, b2: 120, b3: 180, b4: 60 },
@@ -547,12 +527,9 @@
     invalid: { minTargets: 12, hitRateBelow: 0.20, commissionRateAbove: 0.60 }
   };
 
-  // =========================================================
-  // State
-  // =========================================================
   const State = {
-    phase: "idle", // idle | instruction | running | finished
-    block: null,   // 0..4
+    phase: "idle",
+    block: null,
     blockStartTs: 0,
     blockTimerId: null,
     stimTimeoutId: null,
@@ -563,14 +540,10 @@
     baselineRTs: [],
     omissionThresholdMs: CFG.omissionFallbackMs,
     hasAnyData: false,
-
     demo: { gender:null, age:null, submitted:false, submitKey:null },
     totalTimerId: null
   };
 
-  // =========================================================
-  // DOM
-  // =========================================================
   const stimulusEl = document.getElementById("stimulus");
   const tapBtn = document.getElementById("tapBtn");
   const startBtn = document.getElementById("startBtn");
@@ -605,9 +578,6 @@
   document.addEventListener("gesturestart", (e)=>e.preventDefault());
   document.addEventListener("dblclick", (e)=>e.preventDefault());
 
-  // =========================================================
-  // Utils
-  // =========================================================
   const nowMs = () => performance.now();
   const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
   const randi = (a,b)=>Math.floor(a + Math.random()*(b-a+1));
@@ -679,12 +649,6 @@
     if(State.totalTimerId){ clearInterval(State.totalTimerId); State.totalTimerId=null; }
   }
 
-  // =========================================================
-  // Shapes (SVG) — ✅ 흐트러짐/비율 깨짐 방지 세팅 추가
-  //   - preserveAspectRatio
-  //   - vector-effect="non-scaling-stroke"
-  //   - shape-rendering="geometricPrecision"
-  // =========================================================
   function svgShape(kind, opts={}) {
     const stroke = opts.stroke || "rgba(255,255,255,0.92)";
     const strokeW = opts.strokeW || 10;
@@ -692,30 +656,24 @@
     const size = 260;
     const cx = size/2, cy = size/2;
 
-    const header = `<svg width="100%" height="100%" viewBox="0 0 ${size} ${size}"
-      xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
-      shape-rendering="geometricPrecision">`;
+    const header = `<svg width="100%" height="100%" viewBox="0 0 ${size} ${size}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
     const footer = `</svg>`;
 
     const circle = (r) =>
-      `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"
-        vector-effect="non-scaling-stroke" />`;
+      `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" />`;
 
     const square = (side) => {
       const x = cx - side/2;
       const y = cy - side/2;
-      return `<rect x="${x}" y="${y}" width="${side}" height="${side}" rx="10" fill="${fill}" stroke="${stroke}"
-        stroke-width="${strokeW}" vector-effect="non-scaling-stroke" />`;
+      return `<rect x="${x}" y="${y}" width="${side}" height="${side}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" />`;
     };
 
     const triangle = (radius) => {
       const p1 = [cx, cy - radius];
-      const p2 = [cx - radius*0.8660254, cy + radius*0.5];
-      const p3 = [cx + radius*0.8660254, cy + radius*0.5];
+      const p2 = [cx - radius*0.866, cy + radius*0.5];
+      const p3 = [cx + radius*0.866, cy + radius*0.5];
       return `<path d="M ${p1[0]} ${p1[1]} L ${p2[0]} ${p2[1]} L ${p3[0]} ${p3[1]} Z"
-        fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" stroke-linejoin="round"
-        vector-effect="non-scaling-stroke" />`;
+        fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" stroke-linejoin="round" />`;
     };
 
     function drawBasic(k, scale=1.0){
@@ -734,7 +692,7 @@
       const inner = opts.inner;
       return header
         + drawBasic(outer, 1.0)
-        + `<g opacity="0.98">` + drawBasic(inner, 0.55) + `</g>`
+        + `<g opacity="0.95">` + drawBasic(inner, 0.55) + `</g>`
         + footer;
     }
     return header + footer;
@@ -749,13 +707,6 @@
     stimulusEl.innerHTML = "";
   }
 
-  // =========================================================
-  // ✅ 단계 규칙 텍스트
-  //  - 요청 반영:
-  //    * 2단계 안내: "속도 올라감" 같은 문구 없음
-  //    * 3단계 안내: "속도 유지" / "타겟 최소" 같은 문구 없음
-  //    * 4단계 안내: "초반 연습(피드백 on) 이후 off" 문구 없음
-  // =========================================================
   function stageNameFromBlock(block){
     return `${block + 1}단계`;
   }
@@ -771,7 +722,7 @@
       case 3:
         return `${stageNameFromBlock(block)} (약 3분)\n복합도형 중\n'세모(△) 안에 동그라미(○)'일 때만 TAP`;
       case 4:
-        return `${stageNameFromBlock(block)} (쿨다운, 약 1분)\n동그라미(○) / 세모(△) / 네모(□) 중\n네모(□)일 때만 TAP`;
+        return `${stageNameFromBlock(block)} (쿨다운, 약 1분)\n동그라미(○) / 세모(△) / 네모(□)\n네모(□)일 때만 TAP`;
       default:
         return "";
     }
@@ -827,9 +778,6 @@
     return randi(CFG.isiFixedMin, CFG.isiFixedMax);
   }
 
-  // =========================================================
-  // Trial record
-  // =========================================================
   function newTrial(block, trialIndex, stimPack){
     return {
       id: (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now())+"-"+Math.random()),
@@ -851,17 +799,10 @@
     };
   }
 
-  // =========================================================
-  // Flow control
-  // =========================================================
   function stopAllTimers(){
     if(State.blockTimerId) { clearInterval(State.blockTimerId); State.blockTimerId=null; }
     if(State.stimTimeoutId){ clearTimeout(State.stimTimeoutId); State.stimTimeoutId=null; }
     if(State.nextStimTimeoutId){ clearTimeout(State.nextStimTimeoutId); State.nextStimTimeoutId=null; }
-  }
-
-  function hideTooltip(){
-    tooltip.classList.remove("show");
   }
 
   function resetAll(){
@@ -1016,9 +957,6 @@
     }
   }
 
-  // =========================================================
-  // Tap handling
-  // =========================================================
   function handleTap(){
     if(State.phase!=="running") return;
     if(!State.awaitingTrialId) return;
@@ -1078,9 +1016,6 @@
     State.omissionThresholdMs = Math.min(raw, CFG.omissionCapMs);
   }
 
-  // =========================================================
-  // Results summaries
-  // =========================================================
   function summarizeBlock(block){
     const ts = State.trials.filter(t=>t.block===block);
     const total = ts.length;
@@ -1130,6 +1065,7 @@
     return 0;
   }
 
+  // ✅ Global bins: 기존 4지표 + "All responses mean RT" 추가
   function summarizeGlobalBins(binSec){
     const blocks = [1,2,3,4];
     const all = State.trials.filter(t=>blocks.includes(t.block));
@@ -1167,14 +1103,22 @@
       const nontargets = total-targets;
       const omissions = trials.filter(t=>t.isOmission).length;
       const commissions = trials.filter(t=>t.isCommission).length;
+      const anticip = trials.filter(t=>t.isAnticipatory).length;
 
-      const validRTs = trials
+      // Hit RT들 (기존 공식 지표)
+      const hitRTs = trials
         .filter(t=>t.isHit && !t.isAnticipatory && typeof t.rtMs==="number")
         .map(t=>t.rtMs);
 
-      const m = validRTs.length ? mean(validRTs) : null;
-      const sd = std(validRTs);
+      const m = hitRTs.length ? mean(hitRTs) : null;
+      const sd = std(hitRTs);
       const rtv = (m && sd && m>0) ? (sd/m) : null;
+
+      // ✅ All responses RT (눌린 trial 전체: Hit + Commission + Anticip 포함)
+      const respRTs = trials
+        .filter(t=>t.tappedAtMs!==null && typeof t.rtMs==="number")
+        .map(t=>t.rtMs);
+      const respMeanRT = respRTs.length ? mean(respRTs) : null;
 
       const gis = chunk.map(x=>x.gi).sort((a,b)=>a-b);
       const center = (start+end)/2;
@@ -1185,10 +1129,20 @@
 
       out.push({
         startSec: start, endSec: end,
+
+        // 기존 4지표
         meanRT: m,
         rtv: rtv,
         omissionRate: targets? omissions/targets : null,
         commissionRate: nontargets? commissions/nontargets : null,
+
+        // ✅ 추가: all response RT + 보조 count
+        respMeanRT: respMeanRT,
+        respN: respRTs.length,
+        anticipCount: anticip,
+        commissionCount: commissions,
+        omissionCount: omissions,
+
         trialIndexMin: gis[0] ?? null,
         trialIndexMax: gis[gis.length-1] ?? null,
         nearestTrialIndex: nearest ? nearest.gi : null
@@ -1197,9 +1151,6 @@
     return out;
   }
 
-  // =========================================================
-  // Charts
-  // =========================================================
   const ChartHub = {
     gbins: [],
     charts: [],
@@ -1233,7 +1184,7 @@
             <div>Hit rate</div><div>${s.hitRate===null ? "N/A" : fmt(s.hitRate,3)}</div>
             <div>Omission rate</div><div>${showNull ? "NULL" : fmt(s.omissionRate,3)}</div>
             <div>Commission rate</div><div>${showNull ? "NULL" : fmt(s.commissionRate,3)}</div>
-            <div>Mean RT</div><div>${showNull ? "NULL" : fmtMs(s.meanRT)}</div>
+            <div>Mean RT (Hit only)</div><div>${showNull ? "NULL" : fmtMs(s.meanRT)}</div>
             <div>RTV (SD/Mean)</div><div>${showNull ? "NULL" : (s.rtv===null ? "N/A" : fmt(s.rtv,3))}</div>
             <div>Anticipatory rate</div><div>${showNull ? "NULL" : fmt(s.anticipRate,3)}</div>
             <div>Valid RT N</div><div>${s.validRTN}</div>
@@ -1255,11 +1206,13 @@
       return;
     }
 
+    // ✅ 패널 추가: All responses mean RT
     const panels = [
-      { key:"meanRT",        title:"Mean RT (ms)",      format:(v)=>v.toFixed(0) },
-      { key:"rtv",           title:"RTV (SD/Mean)",     format:(v)=>v.toFixed(2) },
-      { key:"omissionRate",  title:"Omission rate",     format:(v)=>v.toFixed(2) },
-      { key:"commissionRate",title:"Commission rate",  format:(v)=>v.toFixed(2) },
+      { key:"respMeanRT",    title:"All responses Mean RT (ms)", format:(v)=>v.toFixed(0) },
+      { key:"meanRT",        title:"Mean RT (Hit only, ms)",     format:(v)=>v.toFixed(0) },
+      { key:"rtv",           title:"RTV (SD/Mean)",              format:(v)=>v.toFixed(2) },
+      { key:"omissionRate",  title:"Omission rate",              format:(v)=>v.toFixed(2) },
+      { key:"commissionRate",title:"Commission rate",            format:(v)=>v.toFixed(2) },
     ];
 
     for(const p of panels){
@@ -1358,9 +1311,13 @@
   }
 
   function positionTooltip(clientX, clientY){
-    tooltip.style.left = `${Math.min(clientX+14, window.innerWidth-260)}px`;
-    tooltip.style.top  = `${Math.min(clientY+14, window.innerHeight-140)}px`;
+    tooltip.style.left = `${Math.min(clientX+14, window.innerWidth-280)}px`;
+    tooltip.style.top  = `${Math.min(clientY+14, window.innerHeight-160)}px`;
     tooltip.classList.add("show");
+  }
+
+  function hideTooltip(){
+    tooltip.classList.remove("show");
   }
 
   function setSharedActiveIdx(idx, clientX, clientY){
@@ -1396,8 +1353,12 @@
       const range = (gb.trialIndexMin && gb.trialIndexMax) ? `Trials #${gb.trialIndexMin}–#${gb.trialIndexMax}` : `Trials NA`;
       const nearest = (gb.nearestTrialIndex) ? `Nearest trial: #${gb.nearestTrialIndex}` : `Nearest trial: NA`;
 
+      // ✅ all-response 차트에서 납득 보조로 count도 보여줌
+      const extra =
+        `RespN: ${gb.respN ?? "NA"} | Om:${gb.omissionCount ?? "NA"} Co:${gb.commissionCount ?? "NA"} Ant:${gb.anticipCount ?? "NA"}`;
+
       tooltip.textContent =
-        `t=${gb.startSec}–${gb.endSec}s (bin ${idx+1})\n${range}\n${nearest}\nValue: ${valText}`;
+        `t=${gb.startSec}–${gb.endSec}s (bin ${idx+1})\n${range}\n${nearest}\n${extra}\nValue: ${valText}`;
     };
 
     const onMove = (e) => {
@@ -1423,9 +1384,6 @@
     canvas.addEventListener("touchend", onEnd, {passive:true});
   }
 
-  // =========================================================
-  // Submission payload
-  // =========================================================
   function buildSummary(){
     const blocks = [0,1,2,3,4];
     const perBlock = {};
@@ -1461,9 +1419,6 @@
     return { ok:true, key };
   }
 
-  // =========================================================
-  // Demo UI
-  // =========================================================
   const GENDERS = [
     { label:"남성", value:"male" },
     { label:"여성", value:"female" },
@@ -1520,9 +1475,6 @@
     demoSheet.classList.remove("show");
   }
 
-  // =========================================================
-  // Events
-  // =========================================================
   tapBtn.addEventListener("pointerdown", (e)=>{ e.preventDefault(); handleTap(); }, {passive:false});
   tapBtn.addEventListener("touchstart",  (e)=>{ e.preventDefault(); handleTap(); }, {passive:false});
 
@@ -1588,11 +1540,7 @@
     }
   };
 
-  // =========================================================
-  // Initial
-  // =========================================================
   resetAll();
-
 })();
 </script>
 </body>
