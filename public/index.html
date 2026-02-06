@@ -224,6 +224,35 @@
       background: var(--chipOn);
       border-color: var(--chipOnStroke);
     }
+
+    /* ✅ 나이 드롭다운 스타일 */
+    .selectWrap{
+      margin-top: 10px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .ageSelect{
+      width: min(320px, 100%);
+      padding: 12px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.92);
+      font-weight: 900;
+      font-size: 16px;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+    }
+    .ageSelect option{
+      background: #111;
+      color: rgba(255,255,255,0.92);
+      font-weight: 800;
+    }
+
     .statusLine{
       margin-top: 10px;
       font-size: 13px;
@@ -418,7 +447,9 @@
       <div class="chips" id="genderChips"></div>
 
       <div style="margin-top:14px;font-weight:900;color:rgba(255,255,255,0.88)">나이 (만)</div>
-      <div class="chips" id="ageChips"></div>
+      <div class="selectWrap">
+        <select id="ageSelect" class="ageSelect" aria-label="나이 선택"></select>
+      </div>
 
       <div id="submitStatus" class="statusLine"></div>
 
@@ -574,7 +605,7 @@
   // demo sheet
   const demoSheet = document.getElementById("demoSheet");
   const genderChips = document.getElementById("genderChips");
-  const ageChips = document.getElementById("ageChips");
+  const ageSelect = document.getElementById("ageSelect");
   const cancelDemo = document.getElementById("cancelDemo");
   const submitAndOpen = document.getElementById("submitAndOpen");
   const submitStatus = document.getElementById("submitStatus");
@@ -828,6 +859,12 @@
     stopAllTimers();
     stopTotalTimer();
     hideStimulus();
+
+    // ✅ 오버레이/시트/결과가 화면 위를 덮어서 Start 막는 사고 방지
+    overlay.classList.remove("show");
+    demoSheet.classList.remove("show");
+    results.classList.remove("show");
+    hideTooltip();
 
     setPhase("idle");
     State.block=null;
@@ -1417,6 +1454,7 @@
       summary: buildSummary(),
     };
 
+    // ✅ 1순위 해결책: presign 요청에서 contentType을 빼서 서명조건 단순화
     const { url, key } = await getPresignedPutUrl();
     await putJsonToS3(url, payload);
 
@@ -1424,22 +1462,12 @@
   }
 
   // =========================================================
-  // Demo UI (✅ 최소 변경: 칩 UI 유지, 옵션만 교체)
+  // Demo UI
   // =========================================================
-  const AGE_MIN = 5;
-  const AGE_MAX = 70;
-
-  // ✅ 선택안함 제거
   const GENDERS = [
     { label:"남성", value:"male" },
     { label:"여성", value:"female" },
   ];
-
-  // ✅ 5~70 개별 나이 생성 (타이핑 없음)
-  const AGES = Array.from({length: (AGE_MAX-AGE_MIN+1)}, (_,i)=>{
-    const age = AGE_MIN + i;
-    return { label: `${age}`, value: String(age) };
-  });
 
   function renderChips(container, items, onPick){
     container.innerHTML = "";
@@ -1452,17 +1480,33 @@
     }
   }
 
-  // ✅ items 기반으로 on 표시 (인덱스 의존 제거: 안정)
-  function setChipOnByItems(container, items, value){
-    const chips = [...container.querySelectorAll(".chip")];
-    chips.forEach((el, i)=>{
-      const v = items[i]?.value;
+  function setChipOn(container, value){
+    [...container.querySelectorAll(".chip")].forEach((el, i)=>{
+      const v = GENDERS[i].value;
       el.classList.toggle("on", v===value);
     });
   }
 
+  function renderAgeSelect(minAge, maxAge){
+    ageSelect.innerHTML = "";
+
+    const ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = "나이를 선택";
+    ph.disabled = true;
+    ph.selected = true;
+    ageSelect.appendChild(ph);
+
+    for(let a=minAge; a<=maxAge; a++){
+      const opt = document.createElement("option");
+      opt.value = String(a);
+      opt.textContent = String(a);
+      ageSelect.appendChild(opt);
+    }
+  }
+
   function updateSubmitButton(){
-    const ok = !!State.demo.gender && !!State.demo.age;
+    const ok = !!State.demo.gender && (State.demo.age !== null && State.demo.age !== undefined && State.demo.age !== "");
     submitAndOpen.disabled = !ok;
   }
 
@@ -1507,13 +1551,14 @@
   // demo chips
   renderChips(genderChips, GENDERS, (v)=>{
     State.demo.gender = v;
-    setChipOnByItems(genderChips, GENDERS, v);
+    setChipOn(genderChips, v);
     updateSubmitButton();
   });
 
-  renderChips(ageChips, AGES, (v)=>{
-    State.demo.age = v; // "5" ~ "70"
-    setChipOnByItems(ageChips, AGES, v);
+  // age select
+  renderAgeSelect(5, 70);
+  ageSelect.addEventListener("change", ()=>{
+    State.demo.age = ageSelect.value; // "25" 같은 문자열로 저장 (원하면 Number(ageSelect.value)로 바꿔도 됨)
     updateSubmitButton();
   });
 
@@ -1540,7 +1585,7 @@
 
     }catch(err){
       submitStatus.textContent = `제출 실패 ❌ (${err?.message || err})`;
-      submitStatus.classListName = "statusLine bad";
+      submitStatus.className = "statusLine bad";
       submitAndOpen.disabled = false;
     }
   };
