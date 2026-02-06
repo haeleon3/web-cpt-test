@@ -41,7 +41,6 @@
       align-items:stretch;
     }
 
-    /* top strip */
     .topStrip{
       display:flex;
       justify-content:space-between;
@@ -68,7 +67,6 @@
       font-weight: 900;
     }
 
-    /* stimulus panel */
     .panel{
       width:100%;
       aspect-ratio: 16 / 8;
@@ -82,6 +80,15 @@
       justify-content:center;
       position:relative;
       overflow:hidden;
+      transition: border-color 120ms ease, box-shadow 120ms ease;
+    }
+    .panel.feedback-ok{
+      border-color: rgba(70,200,120,0.85);
+      box-shadow: 0 0 0 2px rgba(70,200,120,0.20) inset;
+    }
+    .panel.feedback-bad{
+      border-color: rgba(229,57,53,0.85);
+      box-shadow: 0 0 0 2px rgba(229,57,53,0.20) inset;
     }
     .panelInner{
       width: 70%;
@@ -96,7 +103,6 @@
     }
     .panelInner.show{ opacity: 1; }
 
-    /* TAP button */
     .tap{
       width:100%;
       height: 96px;
@@ -113,7 +119,6 @@
     .tap:active{ transform: scale(0.985); filter: brightness(1.05); }
     .tap:disabled{ opacity:0.35; }
 
-    /* bottom idle controls */
     .idleControls{
       display:flex;
       flex-direction:column;
@@ -132,7 +137,6 @@
       align-items:center;
     }
 
-    /* overlay screens */
     .overlay{
       position:fixed;
       inset:0;
@@ -153,8 +157,6 @@
       color: var(--text);
     }
     .modal h2{ margin:0 0 10px 0; font-size: 22px; }
-
-    /* ✅ 단계 안내(규칙) 가독성 50%↑ */
     .modal p{
       margin:8px 0;
       color: var(--muted);
@@ -163,7 +165,6 @@
       font-size: 24px;
       font-weight: 850;
     }
-
     .modal .row{
       display:flex;
       gap:12px;
@@ -188,7 +189,6 @@
     }
     .btn:disabled{ opacity:0.45; }
 
-    /* demographic sheet */
     .sheet{
       position:fixed;
       inset:0;
@@ -225,7 +225,6 @@
       border-color: var(--chipOnStroke);
     }
 
-    /* ✅ 나이 드롭다운 스타일 */
     .selectWrap{
       margin-top: 10px;
       display:flex;
@@ -262,7 +261,6 @@
     .statusLine.ok{ color: var(--ok); }
     .statusLine.bad{ color: var(--bad); }
 
-    /* results */
     .results{
       position:fixed;
       inset:0;
@@ -312,7 +310,6 @@
       border: 1px solid rgba(255,255,255,0.10);
     }
 
-    /* ✅ “파란 원” 영역 제거 대신, 작고 단순한 닫기 X만 */
     .closeX{
       width: 38px;
       height: 38px;
@@ -402,13 +399,12 @@
         <div class="badge"><span class="mut">상태</span> <span id="statusText">IDLE</span></div>
       </div>
 
-      <div class="panel">
+      <div id="panel" class="panel">
         <div id="stimulus" class="panelInner"></div>
       </div>
 
       <button id="tapBtn" class="tap" disabled>TAP</button>
 
-      <!-- idle일 때만 보여야 하는 영역 -->
       <div id="idleControls" class="idleControls">
         <div class="hint" id="hint">
           Start 후에는 <b>빨간 TAP</b>만 누르세요 (단계 시작 때 규칙 안내가 뜹니다)
@@ -423,7 +419,6 @@
     </div>
   </div>
 
-  <!-- Instruction overlay -->
   <div id="overlay" class="overlay">
     <div class="modal">
       <h2 id="ovTitle">규칙</h2>
@@ -435,7 +430,6 @@
     </div>
   </div>
 
-  <!-- Demographics sheet -->
   <div id="demoSheet" class="sheet">
     <div class="modal">
       <h2>성별 / 나이</h2>
@@ -460,24 +454,23 @@
     </div>
   </div>
 
-  <!-- Results -->
   <div id="results" class="results">
     <div class="inner">
       <div class="topbar">
         <h1>Results</h1>
         <div class="topbarRight">
-          <span id="thrPill" class="pill">Omission threshold: -</span>
+          <span id="thrPill" class="pill">RT rules: -</span>
           <button id="closeResults" class="closeX" aria-label="닫기" title="닫기">×</button>
         </div>
       </div>
 
       <div class="section">
-        <h3>단계별 요약</h3>
+        <h3>단계별 요약 (Core: 1~3단계만 표시)</h3>
         <div id="blockSummaries" class="muted">-</div>
       </div>
 
       <div class="section">
-        <h3>전체 타임라인 4지표 차트 (15s bin)</h3>
+        <h3>Core 타임라인 4지표 차트 (15s bin)</h3>
         <div class="muted">터치/드래그하면 같은 시간대(x축)가 4개 차트에서 함께 움직입니다.</div>
         <div class="chartGrid" id="quadCharts"></div>
       </div>
@@ -502,9 +495,7 @@
 <script>
 (() => {
   // =========================================================
-  // ✅ Presigned URL 기반 S3 업로드 (Vercel API Route 사용)
-  //    - /api/get-presigned-url (POST) -> { url, key }
-  //    - 그 url로 PUT JSON
+  // Presigned URL 기반 S3 업로드
   // =========================================================
   async function getPresignedPutUrl(contentType){
     const res = await fetch("/api/get-presigned-url", {
@@ -522,7 +513,6 @@
   }
 
   async function putJsonToS3(presignedUrl, payload){
-    // ✅ 1순위 해결책: content-type 헤더 제거 (서명 불일치 403 방지)
     const res = await fetch(presignedUrl, {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -533,23 +523,72 @@
   }
 
   // =========================================================
-  // Config (기존 로직 유지)
+  // ✅ New Config (9분 목표 유지: 60+120+120+180+60=540s)
   // =========================================================
   const CFG = {
     stimOnMs: 180,
+
+    // block durations in seconds
     dur: { b0: 60, b1: 120, b2: 120, b3: 180, b4: 60 },
+
     instructionSec: 10,
-    isiFixedMin: 1000,
-    isiFixedMax: 1600,
-    isiB2: { pre:[1000,1600], mid:[700,1100], post:[1000,1600] },
-    baselineMinN: 30,
-    omissionAddMs: 250,
-    omissionCapMs: 1200,
-    omissionFallbackMs: 1100,
+
+    // ✅ fixed onset-to-onset ISI per block
+    isiMs: { b0:1200, b1:900, b2:900, b3:1200, b4:900 },
+
+    // ✅ response window per block (used for omission/late)
+    winMs: { b0:900, b1:650, b2:650, b3:900, b4:650 },
+
+    // anticipatory threshold
     anticipatoryMs: 150,
+
+    // chart bin
     binSec: 15,
-    invalid: { minTargets: 12, hitRateBelow: 0.20, commissionRateAbove: 0.60 }
+
+    // core validity (optional)
+    invalid: { minTargets: 12, hitRateBelow: 0.20, commissionRateAbove: 0.60 },
+
+    // block2/b3 target ratios (core)
+    ratios: {
+      coreB1_target: 0.30, // block1 (core speed-up) target ratio
+      coreB2_target: 0.15, // block2 (core inhibition↑) target ratio
+      // collapse probe block3 fixed ratios (4b)
+      collapse_target: 0.20,
+      collapse_lure: 0.20,
+    },
+
+    // collapse learning segment length (4a)
+    collapseLearnTrials: 20,
   };
+
+  // =========================================================
+  // Helpers: block meta
+  // =========================================================
+  function blockMeta(block){
+    // block: 0..4
+    if(block===0) return { phase:"core",    ruleSetId:"B0_adapt_square_v1" };
+    if(block===1) return { phase:"core",    ruleSetId:"B1_core_triangle_fast_v1" };
+    if(block===2) return { phase:"core",    ruleSetId:"B2_core_triangle_inhibit_v1" };
+    if(block===3) return { phase:"collapse",ruleSetId:"B3_nested_collapse_v1" };
+    if(block===4) return { phase:"recovery",ruleSetId:"B4_recovery_triangle_v1" };
+    return { phase:"unknown", ruleSetId:"unknown" };
+  }
+  function onsetToOnsetMs(block){
+    if(block===0) return CFG.isiMs.b0;
+    if(block===1) return CFG.isiMs.b1;
+    if(block===2) return CFG.isiMs.b2;
+    if(block===3) return CFG.isiMs.b3;
+    if(block===4) return CFG.isiMs.b4;
+    return 1000;
+  }
+  function responseWindowMs(block){
+    if(block===0) return CFG.winMs.b0;
+    if(block===1) return CFG.winMs.b1;
+    if(block===2) return CFG.winMs.b2;
+    if(block===3) return CFG.winMs.b3;
+    if(block===4) return CFG.winMs.b4;
+    return 900;
+  }
 
   // =========================================================
   // State
@@ -564,20 +603,22 @@
     awaitingTrialId: null,
     trialIndexInBlock: 0,
     trials: [],
-    baselineRTs: [],
-    omissionThresholdMs: CFG.omissionFallbackMs,
     hasAnyData: false,
 
     // demographics
     demo: { gender:null, age:null, submitted:false, submitKey:null },
 
     // total timer ui
-    totalTimerId: null
+    totalTimerId: null,
+
+    // quality meta
+    quality: { blurCount:0, visibilityChangeCount:0 }
   };
 
   // =========================================================
   // DOM
   // =========================================================
+  const panelEl = document.getElementById("panel");
   const stimulusEl = document.getElementById("stimulus");
   const tapBtn = document.getElementById("tapBtn");
   const startBtn = document.getElementById("startBtn");
@@ -613,29 +654,21 @@
   document.addEventListener("gesturestart", (e)=>e.preventDefault());
   document.addEventListener("dblclick", (e)=>e.preventDefault());
 
+  // quality signals
+  window.addEventListener("blur", ()=>{ State.quality.blurCount += 1; });
+  document.addEventListener("visibilitychange", ()=>{ State.quality.visibilityChangeCount += 1; });
+
   // =========================================================
   // Utils
   // =========================================================
   const nowMs = () => performance.now();
   const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
-  const randi = (a,b)=>Math.floor(a + Math.random()*(b-a+1));
   const mean = (arr)=> arr.reduce((s,x)=>s+x,0)/arr.length;
   const std = (arr)=>{
     if(arr.length<2) return null;
     const m=mean(arr);
     const v=arr.reduce((s,x)=>s+(x-m)*(x-m),0)/(arr.length-1);
     return Math.sqrt(v);
-  };
-  const percentile = (xs, p)=>{
-    if(xs.length===0) return null;
-    const s = [...xs].sort((a,b)=>a-b);
-    if(s.length===1) return s[0];
-    const pp = clamp(p,0,1);
-    const idx = (s.length-1)*pp;
-    const lo = Math.floor(idx), hi = Math.ceil(idx);
-    if(lo===hi) return s[lo];
-    const w = idx-lo;
-    return s[lo]*(1-w) + s[hi]*w;
   };
 
   function setPhase(p){
@@ -749,7 +782,7 @@
   }
 
   // =========================================================
-  // ✅ 단계 규칙 텍스트
+  // Instruction texts
   // =========================================================
   function stageNameFromBlock(block){
     return `${block + 1}단계`;
@@ -758,91 +791,172 @@
   function blockRuleText(block) {
     switch(block){
       case 0:
-        return `${stageNameFromBlock(block)} (약 1분)\n세모(△) / 네모(□) 중\n네모(□)일 때만 TAP`;
+        return `${stageNameFromBlock(block)} (약 1분)\n세모(△) / 네모(□)\n네모(□)일 때만 TAP`;
       case 1:
-        return `${stageNameFromBlock(block)} (약 2분)\n동그라미(○) / 세모(△) 중\n세모(△)일 때만 TAP`;
+        return `${stageNameFromBlock(block)} (약 2분)\n동그라미(○) / 세모(△) / 네모(□)\n세모(△)일 때만 TAP\n(속도 ↑)`;
       case 2:
-        return `${stageNameFromBlock(block)} (약 2분)\n동그라미(○) / 세모(△) / 네모(□) 중\n세모(△)일 때만 TAP`;
+        return `${stageNameFromBlock(block)} (약 2분)\n동그라미(○) / 세모(△) / 네모(□)\n세모(△)일 때만 TAP\n(속도 유지, 타겟 희소 ↑)`;
       case 3:
-        return `${stageNameFromBlock(block)} (약 3분)\n복합도형 중\n'세모(△) 안에 동그라미(○)'일 때만 TAP`;
+        return `${stageNameFromBlock(block)} (약 3분)\n복합도형(중첩) 중\n'동그라미(○) 안에 네모(□)'일 때만 TAP\n※ 초반은 연습(피드백 ON), 이후는 피드백 OFF`;
       case 4:
-        return `${stageNameFromBlock(block)} (쿨다운, 약 1분)\n동그라미(○) / 세모(△) / 네모(□)\n네모(□)일 때만 TAP`;
+        return `${stageNameFromBlock(block)} (쿨다운, 약 1분)\n동그라미(○) / 세모(△) / 네모(□)\n세모(△)일 때만 TAP`;
       default:
         return "";
     }
   }
 
+  // =========================================================
+  // Stimulus generation
+  // =========================================================
+  function weightedPick(items){ // [{v, w}]
+    const total = items.reduce((s,x)=>s+x.w,0);
+    let r = Math.random()*total;
+    for(const it of items){
+      r -= it.w;
+      if(r <= 0) return it.v;
+    }
+    return items[items.length-1].v;
+  }
+
   function makeStimulus(block){
     const C = "circle", T = "triangle", S = "square";
-    function basicPick(list){ return list[Math.floor(Math.random()*list.length)]; }
+
+    // Blocks 1/2/4: 3 shapes with controlled target ratio for triangle
+    function makeCoreTriangle(targetRatio){
+      const nonRatio = (1 - targetRatio) / 2;
+      const pick = weightedPick([
+        { v:T, w: targetRatio },
+        { v:C, w: nonRatio },
+        { v:S, w: nonRatio },
+      ]);
+      const isTarget = (pick===T);
+      return { stim:{kind:"basic",shape:pick}, isTarget, targetDesc:"triangle", renderSvg: svgShape(pick) };
+    }
 
     if(block===0){
-      const pick = basicPick([T,S]);
+      // Adaptation: triangle/square, target square (roughly 50/50)
+      const pick = weightedPick([{v:T,w:0.5},{v:S,w:0.5}]);
       const isTarget = (pick===S);
       return { stim:{kind:"basic",shape:pick}, isTarget, targetDesc:"square", renderSvg: svgShape(pick) };
     }
+
     if(block===1){
-      const pick = basicPick([C,T]);
-      const isTarget = (pick===T);
-      return { stim:{kind:"basic",shape:pick}, isTarget, targetDesc:"triangle", renderSvg: svgShape(pick) };
+      return makeCoreTriangle(CFG.ratios.coreB1_target);
     }
+
     if(block===2){
-      const pick = basicPick([C,T,S]);
-      const isTarget = (pick===T);
-      return { stim:{kind:"basic",shape:pick}, isTarget, targetDesc:"triangle", renderSvg: svgShape(pick) };
+      return makeCoreTriangle(CFG.ratios.coreB2_target);
     }
+
     if(block===3){
+      // Collapse probe: nested 6 combos with fixed target/lure ratios in 4b
       const options = [
-        { outer:C, inner:T, isTarget:false },
-        { outer:S, inner:C, isTarget:false },
-        { outer:T, inner:C, isTarget:true  }
+        { outer:C, inner:S, tag:"target" }, // circle>square target
+        { outer:C, inner:T, tag:"lure"   }, // circle>triangle lure
+        { outer:S, inner:C, tag:"other"  },
+        { outer:S, inner:T, tag:"other"  },
+        { outer:T, inner:C, tag:"other"  },
+        { outer:T, inner:S, tag:"other"  },
       ];
-      const pick = options[Math.floor(Math.random()*options.length)];
+
+      const idxInBlock = State.trialIndexInBlock + 1; // presentStimulus increments before create trial
+      const isLearn = (idxInBlock <= CFG.collapseLearnTrials); // 4a
+      let pick;
+
+      if(isLearn){
+        // 4a: slightly easier distribution for learning (more target/lure)
+        pick = weightedPick([
+          { v: options[0], w: 0.30 },
+          { v: options[1], w: 0.20 },
+          { v: options[2], w: 0.125 },
+          { v: options[3], w: 0.125 },
+          { v: options[4], w: 0.125 },
+          { v: options[5], w: 0.125 },
+        ]);
+      } else {
+        // 4b: fixed target 20%, lure 20%, others 60% evenly
+        pick = weightedPick([
+          { v: options[0], w: CFG.ratios.collapse_target },
+          { v: options[1], w: CFG.ratios.collapse_lure },
+          { v: options[2], w: 0.15 },
+          { v: options[3], w: 0.15 },
+          { v: options[4], w: 0.15 },
+          { v: options[5], w: 0.15 },
+        ]);
+      }
+
+      const isTarget = (pick.tag === "target");
+      const isLure = (pick.tag === "lure");
       return {
-        stim: { kind:"compound", outer: pick.outer, inner: pick.inner },
-        isTarget: pick.isTarget,
-        targetDesc:"triangle_outer+circle_inner",
+        stim: { kind:"compound", outer: pick.outer, inner: pick.inner, tag: pick.tag },
+        isTarget,
+        isLure,
+        targetDesc: "circle_outer+square_inner",
         renderSvg: svgShape("compound", { outer: pick.outer, inner: pick.inner })
       };
     }
-    if(block===4){
-      const pick = basicPick([C,T,S]);
-      const isTarget = (pick===S);
-      return { stim:{kind:"basic",shape:pick}, isTarget, targetDesc:"square", renderSvg: svgShape(pick) };
-    }
-  }
 
-  function isiFor(block, elapsedSec, blockDurSec){
-    if(block===2){
-      const r = clamp(elapsedSec / Math.max(blockDurSec,1), 0, 1);
-      if(r < 0.333) return randi(CFG.isiB2.pre[0],  CFG.isiB2.pre[1]);
-      if(r < 0.666) return randi(CFG.isiB2.mid[0],  CFG.isiB2.mid[1]);
-      return randi(CFG.isiB2.post[0], CFG.isiB2.post[1]);
+    if(block===4){
+      // Recovery: same as block1 (triangle among 3 shapes, fast)
+      return makeCoreTriangle(CFG.ratios.coreB1_target);
     }
-    return randi(CFG.isiFixedMin, CFG.isiFixedMax);
   }
 
   // =========================================================
   // Trial record
   // =========================================================
   function newTrial(block, trialIndex, stimPack){
+    const meta = blockMeta(block);
+    const win = responseWindowMs(block);
+    const isi = onsetToOnsetMs(block);
+    const isCollapse = (meta.phase === "collapse");
+    const subBlock = isCollapse
+      ? (trialIndex <= CFG.collapseLearnTrials ? "B4a" : "B4b")
+      : null;
+
     return {
       id: (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now())+"-"+Math.random()),
       block,
+      phase: meta.phase,
+      ruleSetId: meta.ruleSetId,
+      subBlock, // B4a/B4b for collapse only
+
+      params: {
+        onsetToOnsetMs: isi,
+        responseWindowMs: win,
+        ratios: (block===3)
+          ? { target: CFG.ratios.collapse_target, lure: CFG.ratios.collapse_lure }
+          : (block===1 || block===4)
+            ? { target: CFG.ratios.coreB1_target }
+            : (block===2)
+              ? { target: CFG.ratios.coreB2_target }
+              : null
+      },
+
       trialIndex,
       presentedAtMs: nowMs(),
       blockElapsedSec: 0,
       stim: stimPack.stim,
-      isTarget: stimPack.isTarget,
+      isTarget: !!stimPack.isTarget,
+      isLure: !!stimPack.isLure,
       targetDesc: stimPack.targetDesc,
+
+      responseWindowMs: win,
+
       tappedAtMs: null,
       rtMs: null,
+
       isHit: false,
       isCommission: false,
       isOmission: false,
       isAnticipatory: false,
+
       extraTapCount: 0,
       extraTapRts: [],
+
+      // for collapse learning feedback: record whether feedback was shown
+      feedbackShown: false,
+      feedbackOk: null,
     };
   }
 
@@ -860,7 +974,6 @@
     stopTotalTimer();
     hideStimulus();
 
-    // ✅ 오버레이/시트/결과가 화면 위를 덮어서 Start 막는 사고 방지
     overlay.classList.remove("show");
     demoSheet.classList.remove("show");
     results.classList.remove("show");
@@ -872,10 +985,9 @@
     State.awaitingTrialId=null;
     State.trialIndexInBlock=0;
     State.trials=[];
-    State.baselineRTs=[];
-    State.omissionThresholdMs=CFG.omissionFallbackMs;
     State.hasAnyData=false;
     State.demo = { gender:null, age:null, submitted:false, submitKey:null };
+    State.quality = { blurCount:0, visibilityChangeCount:0 };
 
     tapBtn.disabled=true;
     openResultsBtn.disabled=true;
@@ -920,6 +1032,7 @@
   function startBlock(block){
     stopAllTimers();
     hideStimulus();
+    panelEl.classList.remove("feedback-ok","feedback-bad");
 
     setPhase("running");
     State.block = block;
@@ -964,6 +1077,7 @@
     const elapsedSec = (nowMs() - State.blockStartTs)/1000;
 
     const stimPack = makeStimulus(block);
+
     State.trialIndexInBlock += 1;
 
     const t = newTrial(block, State.trialIndexInBlock, stimPack);
@@ -976,13 +1090,13 @@
     State.awaitingTrialId = t.id;
 
     showStimulus(stimPack.renderSvg);
-
     State.stimTimeoutId = setTimeout(()=>{ hideStimulus(); }, CFG.stimOnMs);
 
-    const thr = State.omissionThresholdMs;
-    setTimeout(()=> finalizeOmissionIfNeeded(t.id), thr);
+    // finalize omission after response window
+    setTimeout(()=> finalizeOmissionIfNeeded(t.id), t.responseWindowMs);
 
-    const isi = isiFor(block, elapsedSec, durSec);
+    // next onset scheduled with fixed onset-to-onset
+    const isi = onsetToOnsetMs(block);
     scheduleNextStimulus(isi);
   }
 
@@ -990,8 +1104,7 @@
     stopAllTimers();
     hideStimulus();
     tapBtn.disabled=true;
-
-    if(block===0){ computeOmissionThreshold(); }
+    panelEl.classList.remove("feedback-ok","feedback-bad");
 
     if(block < 4){
       const next = block + 1;
@@ -1006,6 +1119,15 @@
       stopTotalTimer();
       totalRemainEl.textContent = formatRemain(0);
     }
+  }
+
+  // =========================================================
+  // Feedback helper for collapse learning segment (B4a)
+  // =========================================================
+  function flashFeedback(ok){
+    panelEl.classList.remove("feedback-ok","feedback-bad");
+    panelEl.classList.add(ok ? "feedback-ok" : "feedback-bad");
+    setTimeout(()=> panelEl.classList.remove("feedback-ok","feedback-bad"), 120);
   }
 
   // =========================================================
@@ -1033,21 +1155,45 @@
 
     if(rt < CFG.anticipatoryMs){
       t.isAnticipatory = true;
+      // anticipatory counts as commission if nontarget (keep original spirit)
       if(!t.isTarget) t.isCommission = true;
+      // feedback (learning segment only)
+      if(t.phase==="collapse" && t.subBlock==="B4a"){
+        t.feedbackShown = true;
+        t.feedbackOk = false;
+        flashFeedback(false);
+      }
       return;
     }
 
-    if(rt > State.omissionThresholdMs){
+    // too late => treat as omission for target, commission for nontarget
+    if(rt > t.responseWindowMs){
       if(t.isTarget) t.isOmission = true;
       else t.isCommission = true;
+
+      if(t.phase==="collapse" && t.subBlock==="B4a"){
+        t.feedbackShown = true;
+        t.feedbackOk = false;
+        flashFeedback(false);
+      }
       return;
     }
 
+    // within window
     if(t.isTarget){
       t.isHit = true;
-      if(t.block===0) State.baselineRTs.push(rt);
+      if(t.phase==="collapse" && t.subBlock==="B4a"){
+        t.feedbackShown = true;
+        t.feedbackOk = true;
+        flashFeedback(true);
+      }
     } else {
       t.isCommission = true;
+      if(t.phase==="collapse" && t.subBlock==="B4a"){
+        t.feedbackShown = true;
+        t.feedbackOk = false;
+        flashFeedback(false);
+      }
     }
   }
 
@@ -1057,21 +1203,16 @@
     const t = State.trials[idx];
     if(t.tappedAtMs===null && t.isTarget){
       t.isOmission = true;
+      if(t.phase==="collapse" && t.subBlock==="B4a"){
+        t.feedbackShown = true;
+        t.feedbackOk = false;
+        flashFeedback(false);
+      }
     }
-  }
-
-  function computeOmissionThreshold(){
-    if(State.baselineRTs.length < CFG.baselineMinN){
-      State.omissionThresholdMs = CFG.omissionFallbackMs;
-      return;
-    }
-    const p90 = percentile(State.baselineRTs, 0.90);
-    const raw = Math.round(p90) + CFG.omissionAddMs;
-    State.omissionThresholdMs = Math.min(raw, CFG.omissionCapMs);
   }
 
   // =========================================================
-  // Results summaries
+  // Results summaries (CORE ONLY for user)
   // =========================================================
   function summarizeBlock(block){
     const ts = State.trials.filter(t=>t.block===block);
@@ -1115,15 +1256,15 @@
   }
 
   function blockOffsetSec(block){
-    if(block===1) return 0;
-    if(block===2) return CFG.dur.b1;
-    if(block===3) return CFG.dur.b1 + CFG.dur.b2;
-    if(block===4) return CFG.dur.b1 + CFG.dur.b2 + CFG.dur.b3;
+    // offsets for core blocks 0..2 only
+    if(block===0) return 0;
+    if(block===1) return CFG.dur.b0;
+    if(block===2) return CFG.dur.b0 + CFG.dur.b1;
     return 0;
   }
 
   function summarizeGlobalBins(binSec){
-    const blocks = [1,2,3,4];
+    const blocks = [0,1,2]; // ✅ core only
     const all = State.trials.filter(t=>blocks.includes(t.block));
     if(!all.length) return [];
 
@@ -1190,7 +1331,7 @@
   }
 
   // =========================================================
-  // ✅ 차트: x축 동기화(공유 커서)
+  // Charts: shared crosshair (unchanged)
   // =========================================================
   const ChartHub = {
     gbins: [],
@@ -1200,9 +1341,9 @@
   };
 
   function renderResults(){
-    thrPill.textContent = `Omission threshold: ${Math.round(State.omissionThresholdMs)}ms (baseline p90 + ${CFG.omissionAddMs}, cap ${CFG.omissionCapMs})`;
+    thrPill.textContent = `RT rules: anticipatory < ${CFG.anticipatoryMs}ms | omission window = per-block`;
 
-    const blocks = [1,2,3,4];
+    const blocks = [0,1,2]; // ✅ core only
     let html = "";
     for(const b of blocks){
       const s = summarizeBlock(b);
@@ -1420,25 +1561,42 @@
   }
 
   // =========================================================
-  // Submission payload (그대로 유지)
+  // Submission payload (includes labeled trials + block meta)
   // =========================================================
+  function buildBlocksMeta(){
+    const blocks = [0,1,2,3,4];
+    return blocks.map(b=>{
+      const meta = blockMeta(b);
+      return {
+        block_id: b,
+        phase: meta.phase,
+        ruleSetId: meta.ruleSetId,
+        durationSec: blockDurSec(b),
+        params: {
+          onsetToOnsetMs: onsetToOnsetMs(b),
+          responseWindowMs: responseWindowMs(b),
+          ratios: (b===3)
+            ? { target: CFG.ratios.collapse_target, lure: CFG.ratios.collapse_lure, learnTrials: CFG.collapseLearnTrials }
+            : (b===1 || b===4)
+              ? { target: CFG.ratios.coreB1_target }
+              : (b===2)
+                ? { target: CFG.ratios.coreB2_target }
+                : null
+        }
+      };
+    });
+  }
+
   function buildSummary(){
     const blocks = [0,1,2,3,4];
     const perBlock = {};
     for(const b of blocks){
       perBlock["b"+b] = summarizeBlock(b);
     }
-    const globalBins = summarizeGlobalBins(CFG.binSec);
-    return {
-      omissionThresholdMs: State.omissionThresholdMs,
-      perBlock,
-      globalBins
-    };
+    const globalBins = summarizeGlobalBins(CFG.binSec); // core-only
+    return { perBlock, globalBins };
   }
 
-  // =========================================================
-  // ✅ submitToServer: Lambda 대신 presigned PUT으로 S3 저장
-  // =========================================================
   async function submitToServer(){
     const payload = {
       meta: {
@@ -1446,15 +1604,16 @@
         userAgent: navigator.userAgent,
         lang: navigator.language,
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
+        testVersion: "cpt_web_v2_core+collapse",
       },
       demographics: { ...State.demo },
+      quality: { ...State.quality },
       cfg: CFG,
-      omissionThresholdMs: State.omissionThresholdMs,
+      blocks: buildBlocksMeta(),
       trials: State.trials,
       summary: buildSummary(),
     };
 
-    // ✅ 1순위 해결책: presign 요청에서 contentType을 빼서 서명조건 단순화
     const { url, key } = await getPresignedPutUrl();
     await putJsonToS3(url, payload);
 
@@ -1548,17 +1707,15 @@
     hideTooltip();
   };
 
-  // demo chips
   renderChips(genderChips, GENDERS, (v)=>{
     State.demo.gender = v;
     setChipOn(genderChips, v);
     updateSubmitButton();
   });
 
-  // age select
   renderAgeSelect(5, 70);
   ageSelect.addEventListener("change", ()=>{
-    State.demo.age = ageSelect.value; // "25" 같은 문자열로 저장 (원하면 Number(ageSelect.value)로 바꿔도 됨)
+    State.demo.age = ageSelect.value;
     updateSubmitButton();
   });
 
