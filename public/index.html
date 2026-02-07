@@ -1276,15 +1276,16 @@
       return;
     }
 
+    // ✅ 변경 반영: "파란색 선" -> "흰색 선"
     const panels = [
       { key:"meanRT",        title:"Mean RT (ms)",      format:(v)=>v.toFixed(0),
-        foot:`파란색 선은 약 45초 동안의 평균 반응 속도(단기 흐름)입니다.\n이 선보다 위(빨강)는 평균보다 느려진 구간, 아래(파랑)는 평균보다 빠른 구간입니다.` },
+        foot:`흰색 선은 약 45초 동안의 평균 반응 속도(단기 흐름)입니다.\n이 선보다 위(빨강)는 평균보다 느려진 구간, 아래(파랑)는 평균보다 빠른 구간입니다.` },
       { key:"rtv",           title:"RTV (SD/Mean)",     format:(v)=>v.toFixed(2),
-        foot:`파란색 선은 약 45초 동안의 평균 변동성(단기 흐름)입니다.\n이 선보다 위(빨강)는 더 들쭉날쭉해진 구간, 아래(파랑)는 더 안정적인 구간입니다.` },
+        foot:`흰색 선은 약 45초 동안의 평균 변동성(단기 흐름)입니다.\n이 선보다 위(빨강)는 더 들쭉날쭉해진 구간, 아래(파랑)는 더 안정적인 구간입니다.` },
       { key:"omissionRate",  title:"Omission rate",     format:(v)=>v.toFixed(2),
-        foot:`파란색 선은 약 45초 동안의 평균 누락률(단기 흐름)입니다.\n위(빨강)는 놓침이 늘어난 구간, 아래(파랑)는 줄어든 구간입니다.` },
+        foot:`흰색 선은 약 45초 동안의 평균 누락률(단기 흐름)입니다.\n위(빨강)는 놓침이 늘어난 구간, 아래(파랑)는 줄어든 구간입니다.` },
       { key:"commissionRate",title:"Commission rate",  format:(v)=>v.toFixed(2),
-        foot:`파란색 선은 약 45초 동안의 평균 오반응률(단기 흐름)입니다.\n위(빨강)는 오반응이 늘어난 구간, 아래(파랑)는 줄어든 구간입니다.` },
+        foot:`흰색 선은 약 45초 동안의 평균 오반응률(단기 흐름)입니다.\n위(빨강)는 오반응이 늘어난 구간, 아래(파랑)는 줄어든 구간입니다.` },
     ];
 
     for(const p of panels){
@@ -1312,7 +1313,7 @@
   }
 
   // =========================================================
-  // ✅ 차트 그리기: (1) 중립 라인 (2) 이탈 구간 덧칠 (3) 이동평균(파란선)
+  // ✅ 차트 그리기: (1) 중립 라인 (2) 이탈 구간 덧칠 (3) 이동평균(흰선)
   // =========================================================
   function drawLineChart(canvas, values, ma, gbins, fmt, activeIdx){
     const dpr = window.devicePixelRatio || 1;
@@ -1396,8 +1397,8 @@
       ctx.stroke();
     }
 
-    // (3) moving average baseline line (파란색 선)
-    ctx.strokeStyle = "rgba(40,120,255,0.95)";
+    // (3) moving average baseline line (45초 기준선, ✅ 흰색)
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
     ctx.lineWidth = 2;
     ctx.beginPath();
     let startedMa=false;
