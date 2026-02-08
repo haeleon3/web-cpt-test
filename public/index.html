@@ -549,7 +549,7 @@
       mid:[820,1220],
       post:[1000,1600]
     },
-    baselineMinN: 30,
+    baselineMinN: 12,               // ✅ 변경: 30 -> 12
     omissionAddMs: 250,
     omissionCapMs: 1200,
     omissionFallbackMs: 1100,
@@ -798,42 +798,61 @@
     }
   }
 
+  // =========================================================
+  // ✅ Stimulus generator
+  // - 각 블록별 target 비율을 25%로 고정
+  // =========================================================
   function makeStimulus(block){
     const C = "circle", T = "triangle", S = "square";
-    function basicPick(list){ return list[Math.floor(Math.random()*list.length)]; }
+    const P_TARGET = 0.25;
+    const isTarget = Math.random() < P_TARGET;
+
+    // non-target pick helper
+    const pickOne = (arr)=>arr[Math.floor(Math.random()*arr.length)];
 
     if(block===0){
-      const pick = basicPick([T,S]);
-      const isTarget = (pick===S);
+      // target: square, non-target: triangle
+      const pick = isTarget ? S : T;
       return { stim:{kind:"basic",shape:pick}, isTarget, targetDesc:"square", renderSvg: svgShape(pick) };
     }
     if(block===1){
-      const pick = basicPick([C,T]);
-      const isTarget = (pick===T);
+      // target: triangle, non-target: circle
+      const pick = isTarget ? T : C;
       return { stim:{kind:"basic",shape:pick}, isTarget, targetDesc:"triangle", renderSvg: svgShape(pick) };
     }
     if(block===2){
-      const pick = basicPick([C,T,S]);
-      const isTarget = (pick===T);
+      // target: triangle, non-target: circle or square (반반)
+      const pick = isTarget ? T : pickOne([C,S]);
       return { stim:{kind:"basic",shape:pick}, isTarget, targetDesc:"triangle", renderSvg: svgShape(pick) };
     }
     if(block===3){
-      const options = [
-        { outer:C, inner:T, isTarget:false },
-        { outer:S, inner:C, isTarget:false },
-        { outer:T, inner:C, isTarget:true  }
-      ];
-      const pick = options[Math.floor(Math.random()*options.length)];
-      return {
-        stim: { kind:"compound", outer: pick.outer, inner: pick.inner },
-        isTarget: pick.isTarget,
-        targetDesc:"triangle_outer+circle_inner",
-        renderSvg: svgShape("compound", { outer: pick.outer, inner: pick.inner })
-      };
+      // target: triangle_outer + circle_inner
+      // non-target: (circle_outer+triangle_inner) or (square_outer+circle_inner) (반반)
+      if(isTarget){
+        const outer = T, inner = C;
+        return {
+          stim: { kind:"compound", outer, inner },
+          isTarget: true,
+          targetDesc:"triangle_outer+circle_inner",
+          renderSvg: svgShape("compound", { outer, inner })
+        };
+      }else{
+        const nonTargets = [
+          { outer:C, inner:T, isTarget:false },
+          { outer:S, inner:C, isTarget:false },
+        ];
+        const pick = pickOne(nonTargets);
+        return {
+          stim: { kind:"compound", outer: pick.outer, inner: pick.inner },
+          isTarget: false,
+          targetDesc:"triangle_outer+circle_inner",
+          renderSvg: svgShape("compound", { outer: pick.outer, inner: pick.inner })
+        };
+      }
     }
     if(block===4){
-      const pick = basicPick([C,T,S]);
-      const isTarget = (pick===S);
+      // target: square, non-target: circle or triangle (반반)
+      const pick = isTarget ? S : pickOne([C,T]);
       return { stim:{kind:"basic",shape:pick}, isTarget, targetDesc:"square", renderSvg: svgShape(pick) };
     }
   }
@@ -1387,7 +1406,6 @@
       const ok = (x)=> (typeof x==="number" && !Number.isNaN(x));
       if(!ok(v0) || !ok(v1) || !ok(m0) || !ok(m1)) continue;
 
-      // 구간 대표값은 i 시점 기준(단순/직관)
       const sign = (v1 - m1);
       ctx.strokeStyle = (sign >= 0) ? RED : BLUE;
 
