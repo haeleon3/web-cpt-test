@@ -490,6 +490,7 @@
         <h3>해설 참고용 정보</h3>
         <div class="muted">
           - Omission↑: 타겟 놓침(주의 이탈/각성 저하/지속주의 저하 가능)<br/>
+          - Late↑: 눌렀지만 늦음(속도 저하/리듬 붕괴/보수적 처리 가능)<br/>
           - Commission↑: 비타겟 반응(억제 실패/충동/규칙 유지 실패)<br/>
           - MeanRT↑: 처리속도 저하/조심모드/각성 저하 가능<br/>
           - RTV↑: 반응 일관성 붕괴(주의 변동/피로/압박 민감)<br/>
@@ -558,7 +559,10 @@
     invalid: { minTargets: 12, hitRateBelow: 0.20, commissionRateAbove: 0.60 },
 
     // ✅ 이동평균 설정 (45s = 3 bins)
-    maWindowBins: 3
+    maWindowBins: 3,
+
+    // ✅ GO 비율 튜닝: B0는 55%, 나머지는 70%
+    goRate: { b0: 0.55, other: 0.70 }
   };
 
   // =========================================================
@@ -775,7 +779,7 @@
   }
 
   // =========================================================
-  // 단계 규칙 텍스트 (요청대로 “속도/피드백” 언급 없음)
+  // 단계 규칙 텍스트
   // =========================================================
   function stageNameFromBlock(block){
     return `${block + 1}단계`;
@@ -800,11 +804,13 @@
 
   // =========================================================
   // ✅ Stimulus generator
-  // - 각 블록별 target 비율을 25%로 고정
+  // - B0: go=55%
+  // - Others: go=70%
   // =========================================================
   function makeStimulus(block){
     const C = "circle", T = "triangle", S = "square";
-    const P_TARGET = 0.70;
+
+    const P_TARGET = (block===0) ? CFG.goRate.b0 : CFG.goRate.other;
     const isTarget = Math.random() < P_TARGET;
 
     // non-target pick helper
@@ -880,12 +886,19 @@
       stim: stimPack.stim,
       isTarget: stimPack.isTarget,
       targetDesc: stimPack.targetDesc,
+
+      // response
       tappedAtMs: null,
       rtMs: null,
+
+      // outcome labels
       isHit: false,
       isCommission: false,
       isOmission: false,
+      isLate: false,              // ✅ NEW: 타겟인데 threshold 밖(늦음)인 케이스만 true
       isAnticipatory: false,
+
+      // extras
       extraTapCount: 0,
       extraTapRts: [],
     };
@@ -1079,18 +1092,27 @@
     t.tappedAtMs = nowMs();
     t.rtMs = rt;
 
+    // anticipatory: 아주 빠른 반응(예측/성급)
     if(rt < CFG.anticipatoryMs){
       t.isAnticipatory = true;
       if(!t.isTarget) t.isCommission = true;
       return;
     }
 
+    // ✅ threshold 밖 반응 처리
     if(rt > State.omissionThresholdMs){
-      if(t.isTarget) t.isOmission = true;
-      else t.isCommission = true;
+      if(t.isTarget){
+        // 타겟인데 늦음 = omission(결과) + late(원인)
+        t.isOmission = true;
+        t.isLate = true;
+      }else{
+        // 비타겟에서 늦게 누른 건 "억제 실패"로 유지(commission)
+        t.isCommission = true;
+      }
       return;
     }
 
+    // within threshold
     if(t.isTarget){
       t.isHit = true;
       if(t.block===0) State.baselineRTs.push(rt);
@@ -1099,12 +1121,14 @@
     }
   }
 
+  // ✅ 진짜 “아예 안 누른” 타겟만 omission 처리
   function finalizeOmissionIfNeeded(trialId){
     const idx = State.trials.findIndex(x=>x.id===trialId);
     if(idx<0) return;
     const t = State.trials[idx];
     if(t.tappedAtMs===null && t.isTarget){
       t.isOmission = true;
+      // t.isLate는 false 유지
     }
   }
 
@@ -1129,6 +1153,7 @@
 
     const hits = ts.filter(t=>t.isHit).length;
     const omissions = ts.filter(t=>t.isOmission).length;
+    const lates = ts.filter(t=>t.isLate).length;          // ✅ NEW
     const commissions = ts.filter(t=>t.isCommission).length;
     const anticip = ts.filter(t=>t.isAnticipatory).length;
 
@@ -1142,13 +1167,14 @@
 
     const hitRate = targets ? hits/targets : null;
     const omissionRate = targets ? omissions/targets : 0;
+    const lateRate = targets ? lates/targets : 0;         // ✅ NEW
     const commissionRate = nontargets ? commissions/nontargets : 0;
     const anticipRate = total ? anticip/total : 0;
 
     return {
       block, total, targets, nontargets,
-      hits, omissions, commissions, anticip,
-      hitRate, omissionRate, commissionRate,
+      hits, omissions, lates, commissions, anticip,
+      hitRate, omissionRate, lateRate, commissionRate,
       meanRT: m, rtv,
       anticipRate,
       validRTN: validRTs.length
@@ -1205,6 +1231,7 @@
       const total = trials.length;
       const targets = trials.filter(t=>t.isTarget).length;
       const nontargets = total-targets;
+
       const omissions = trials.filter(t=>t.isOmission).length;
       const commissions = trials.filter(t=>t.isCommission).length;
 
@@ -1272,6 +1299,7 @@
             <div>Targets / NonTargets</div><div>${s.targets} / ${s.nontargets}</div>
             <div>Hit rate</div><div>${s.hitRate===null ? "N/A" : fmt(s.hitRate,3)}</div>
             <div>Omission rate</div><div>${showNull ? "NULL" : fmt(s.omissionRate,3)}</div>
+            <div>Late rate</div><div>${showNull ? "NULL" : fmt(s.lateRate,3)}</div>
             <div>Commission rate</div><div>${showNull ? "NULL" : fmt(s.commissionRate,3)}</div>
             <div>Mean RT</div><div>${showNull ? "NULL" : fmtMs(s.meanRT)}</div>
             <div>RTV (SD/Mean)</div><div>${showNull ? "NULL" : (s.rtv===null ? "N/A" : fmt(s.rtv,3))}</div>
@@ -1295,7 +1323,6 @@
       return;
     }
 
-    // ✅ 변경 반영: "파란색 선" -> "흰색 선"
     const panels = [
       { key:"meanRT",        title:"Mean RT (ms)",      format:(v)=>v.toFixed(0),
         foot:`흰색 선은 약 45초 동안의 평균 반응 속도(단기 흐름)입니다.\n이 선보다 위(빨강)는 평균보다 느려진 구간, 아래(파랑)는 평균보다 빠른 구간입니다.` },
@@ -1395,7 +1422,6 @@
     ctx.stroke();
 
     // (2) deviation overlay: ma 기준 위/아래
-    // 위로 이탈(빨강), 아래로 이탈(파랑)
     const RED = "rgba(229,57,53,0.95)";
     const BLUE = "rgba(40,120,255,0.95)";
 
@@ -1415,7 +1441,7 @@
       ctx.stroke();
     }
 
-    // (3) moving average baseline line (45초 기준선, ✅ 흰색)
+    // (3) moving average baseline line (✅ 흰색)
     ctx.strokeStyle = "rgba(255,255,255,0.95)";
     ctx.lineWidth = 2;
     ctx.beginPath();
